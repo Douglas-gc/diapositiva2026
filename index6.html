@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Seguridad en Backend — Slide 6</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:   #00f5ff;
+      --purple: #7b2fff;
+      --green:  #00ff9d;
+      --red:    #ff3c5a;
+      --glow:   rgba(0,245,255,0.18);
+      --bg:     #03060f;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Exo 2', sans-serif;
+      color: #fff;
+      cursor: none; /* hide default — use custom trail */
+    }
+
+    /* ── Particle BG ── */
+    #bg-canvas { position: fixed; inset: 0; z-index: 0; }
+
+    /* ── Cursor trail canvas ── */
+    #trail-canvas { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+
+    /* ── Scanlines ── */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom, transparent, transparent 3px,
+        rgba(0,0,0,0.045) 3px, rgba(0,0,0,0.045) 4px
+      );
+    }
+
+    /* ── Corners ── */
+    .corner { position: fixed; width: 24px; height: 24px; z-index: 10; pointer-events: none; }
+    .corner.tl { top:16px; left:16px;   border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.tr { top:16px; right:16px;  border-top:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+    .corner.bl { bottom:16px; left:16px;  border-bottom:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.br { bottom:16px; right:16px; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+
+    /* ── Custom cursor dot ── */
+    #cursor-dot {
+      position: fixed; z-index: 999; pointer-events: none;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan), 0 0 16px var(--cyan);
+      transform: translate(-50%, -50%);
+      transition: transform 0.05s, opacity 0.15s;
+    }
+
+    /* ════════════════ LAYOUT ════════════════ */
+    #slide {
+      position: relative; z-index: 1;
+      width: 100%; height: 100vh;
+      display: flex; align-items: stretch;
+    }
+
+    /* ── LEFT: Text ── */
+    #text-panel {
+      width: 50%;
+      padding: 4vh 3vw 4vh 6vw;
+      display: flex; flex-direction: column;
+      justify-content: center; gap: 1rem;
+      overflow: hidden;
+    }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,245,255,0.07);
+      border: 1px solid rgba(0,245,255,0.3);
+      border-radius: 999px; padding: 5px 16px;
+      font-size: 0.7rem; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--cyan);
+      width: fit-content;
+      opacity: 0; animation: fadeUp 0.7s ease 0.2s forwards;
+    }
+    .chip-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+      animation: blink 1.8s ease-in-out infinite;
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.2rem, 2.2vw, 1.9rem);
+      font-weight: 900; line-height: 1.15;
+      opacity: 0; animation: fadeUp 0.7s ease 0.35s forwards;
+    }
+    h1 .accent { color: var(--cyan); }
+
+    .divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      border-radius: 2px;
+      opacity: 0; animation: fadeUp 0.7s ease 0.45s forwards;
+    }
+
+    /* ── Section blocks ── */
+    .sec-block { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .sec-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.63rem; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--cyan);
+      opacity: 0;
+    }
+    .sec-label.visible { animation: fadeUp 0.55s ease forwards; }
+
+    /* Auth / protection items */
+    .sec-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 7px;
+      border: 1px solid rgba(0,245,255,0.0);
+      background: rgba(255,255,255,0.02);
+      font-size: clamp(0.75rem, 1.15vw, 0.9rem);
+      color: rgba(255,255,255,0.85);
+      opacity: 0; transform: translateX(-22px);
+      transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+      cursor: default;
+    }
+    .sec-item.visible { animation: slideGlow 0.52s cubic-bezier(.23,1,.32,1) forwards; }
+    .sec-item:hover {
+      border-color: rgba(0,245,255,0.22);
+      background: rgba(0,245,255,0.05);
+      box-shadow: 0 0 16px rgba(0,245,255,0.08);
+    }
+    .sec-item .ico {
+      font-size: 1rem; flex-shrink: 0; width: 22px; text-align: center;
+    }
+    .sec-item strong { color: var(--cyan); font-weight: 600; }
+    .sec-item span.sub { color: rgba(255,255,255,0.45); font-size: 0.8em; }
+
+    /* Threat items */
+    .threat-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 12px; border-radius: 7px;
+      border: 1px solid rgba(255,60,90,0.0);
+      background: rgba(255,255,255,0.02);
+      font-size: clamp(0.73rem, 1.1vw, 0.87rem);
+      color: rgba(255,255,255,0.82);
+      opacity: 0; transform: translateX(-22px);
+      transition: border-color 0.3s, background 0.3s;
+      cursor: default;
+    }
+    .threat-item.visible { animation: slideGlowRed 0.52s cubic-bezier(.23,1,.32,1) forwards; }
+    .threat-item:hover {
+      border-color: rgba(255,60,90,0.25);
+      background: rgba(255,60,90,0.05);
+    }
+    .threat-badge {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.58rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 3px; flex-shrink: 0;
+      background: rgba(255,60,90,0.15);
+      color: var(--red);
+      border: 1px solid rgba(255,60,90,0.35);
+      letter-spacing: 0.05em;
+    }
+
+    /* ── RIGHT: Three.js ── */
+    #canvas-panel {
+      width: 50%; height: 100vh; position: relative;
+    }
+    #three-canvas {
+      width: 100%; height: 100%; display: block; cursor: none;
+    }
+
+    /* ── Overlay ── */
+    #overlay {
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(0,0,0,0); pointer-events: none;
+      transition: background 0.4s ease;
+    }
+    #overlay.active { background: rgba(0,0,0,0.78); pointer-events: auto; }
+
+    /* ── Expanded canvas ── */
+    #expanded-wrap {
+      position: fixed; inset: 0; z-index: 95;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; opacity: 0;
+      transition: opacity 0.38s ease;
+    }
+    #expanded-wrap.active { pointer-events: auto; opacity: 1; }
+    #expanded-canvas {
+      border-radius: 12px;
+      box-shadow: 0 0 90px rgba(0,0,0,0.9), 0 0 30px rgba(0,245,255,0.06);
+      display: block; cursor: none;
+    }
+
+    /* ── Close btn ── */
+    #close-btn {
+      position: fixed; top: 24px; right: 28px; z-index: 100;
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 2px solid var(--cyan); background: rgba(3,6,15,0.85);
+      color: var(--cyan); font-size: 1.25rem;
+      cursor: none; display: none;
+      align-items: center; justify-content: center;
+      box-shadow: 0 0 16px var(--glow);
+      transition: background 0.2s, transform 0.2s;
+    }
+    #close-btn:hover { background: rgba(0,245,255,0.15); transform: scale(1.12); }
+
+    /* ── Nav ── */
+    .nav-arrow {
+      position: fixed; bottom: 32px; z-index: 50;
+      text-decoration: none;
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.5);
+      padding: 10px 20px;
+      border: 1px solid rgba(0,245,255,0.2); border-radius: 999px;
+      background: rgba(3,6,15,0.6); backdrop-filter: blur(8px);
+      transition: color .25s, border-color .25s, box-shadow .25s, transform .25s;
+    }
+    .nav-arrow:hover {
+      color: var(--cyan); border-color: var(--cyan);
+      box-shadow: 0 0 20px var(--glow); transform: translateY(-2px);
+    }
+    .nav-arrow .arrow { font-size: 1.2rem; }
+    #nav-prev { left: 32px; }
+    #nav-next { right: 32px; }
+
+    .slide-num {
+      position: fixed; bottom: 36px; left: 50%;
+      transform: translateX(-50%); z-index: 50;
+      font-family: 'Orbitron', sans-serif; font-size: 0.7rem;
+      letter-spacing: 0.2em; color: rgba(255,255,255,0.25);
+    }
+
+    /* ── Keyframes ── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(12px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes slideGlow {
+      0%   { opacity:0; transform:translateX(-22px); box-shadow:none; }
+      55%  { box-shadow:0 0 18px rgba(0,245,255,0.22); }
+      100% { opacity:1; transform:translateX(0); box-shadow:none; }
+    }
+    @keyframes slideGlowRed {
+      0%   { opacity:0; transform:translateX(-22px); box-shadow:none; }
+      55%  { box-shadow:0 0 18px rgba(255,60,90,0.22); }
+      100% { opacity:1; transform:translateX(0); box-shadow:none; }
+    }
+    @keyframes blink {
+      0%,100% { opacity:1; } 50% { opacity:0.3; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      html, body { overflow-y: auto; cursor: auto; }
+      #cursor-dot { display: none; }
+      #slide { flex-direction: column; height: auto; min-height: 100vh; }
+      #text-panel { width: 100%; padding: 5vh 5vw 2vh; }
+      #canvas-panel { width: 100%; height: 56vw; min-height: 250px; }
+      h1 { font-size: clamp(1rem, 4vw, 1.4rem); }
+      .slide-num { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="bg-canvas"></canvas>
+  <canvas id="trail-canvas"></canvas>
+  <div id="cursor-dot"></div>
+  <div class="scanlines"></div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+
+  <div id="slide">
+
+    <!-- LEFT -->
+    <div id="text-panel">
+      <div class="chip"><span class="chip-dot"></span>Slide 06 — Seguridad</div>
+
+      <h1>🔐 Seguridad en<br/><span class="accent">Backend</span></h1>
+      <div class="divider"></div>
+
+      <!-- Auth block -->
+      <div class="sec-block">
+        <div class="sec-label" id="lbl-auth">Conceptos clave:</div>
+        <div class="sec-item">
+          <span class="ico">🔑</span>
+          <span><strong>Autenticación</strong> <span class="sub">(login)</span></span>
+        </div>
+        <div class="sec-item">
+          <span class="ico">🛡️</span>
+          <span><strong>Autorización</strong> <span class="sub">(roles)</span></span>
+        </div>
+        <div class="sec-item">
+          <span class="ico">🔒</span>
+          <span><strong>Encriptación</strong> <span class="sub">(HTTPS, JWT)</span></span>
+        </div>
+      </div>
+
+      <!-- Threats block -->
+      <div class="sec-block">
+        <div class="sec-label" id="lbl-threats">Protección contra:</div>
+        <div class="threat-item">
+          <span class="threat-badge">SQL</span>
+          <span><strong>SQL Injection</strong></span>
+        </div>
+        <div class="threat-item">
+          <span class="threat-badge">XSS</span>
+          <span><strong>Cross-Site Scripting</strong></span>
+        </div>
+        <div class="threat-item">
+          <span class="threat-badge">CSRF</span>
+          <span><strong>Cross-Site Request Forgery</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div id="canvas-panel">
+      <canvas id="three-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Overlay + Expanded -->
+  <div id="overlay"></div>
+  <div id="expanded-wrap">
+    <canvas id="expanded-canvas"></canvas>
+  </div>
+  <button id="close-btn" title="Cerrar">✕</button>
+
+  <!-- Nav -->
+  <a href="index5.html" class="nav-arrow" id="nav-prev"><span class="arrow">←</span> Anterior</a>
+  <a href="index7.html" class="nav-arrow" id="nav-next">Siguiente <span class="arrow">→</span></a>
+  <div class="slide-num">06 / 07</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+  /* ═══════════════════════════════════════
+     1. STAGGERED TEXT ANIMATION
+  ═══════════════════════════════════════ */
+  (function () {
+    setTimeout(() => document.getElementById('lbl-auth').classList.add('visible'), 650);
+    const secItems = document.querySelectorAll('.sec-item');
+    secItems.forEach((el, i) => setTimeout(() => el.classList.add('visible'), 850 + i * 220));
+
+    setTimeout(() => document.getElementById('lbl-threats').classList.add('visible'), 1600);
+    const threats = document.querySelectorAll('.threat-item');
+    threats.forEach((el, i) => setTimeout(() => el.classList.add('visible'), 1800 + i * 220));
+  })();
+
+  /* ═══════════════════════════════════════
+     2. PARTICLE BACKGROUND
+  ═══════════════════════════════════════ */
+  (function () {
+    const cv = document.getElementById('bg-canvas');
+    const cx = cv.getContext('2d');
+    let W, H, pts = [];
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+    for (let i = 0; i < 170; i++) pts.push({
+      x: Math.random()*W, y: Math.random()*H,
+      vx:(Math.random()-.5)*.28, vy:-(Math.random()*.55+.18),
+      r:Math.random()*1.3+.3, a:Math.random()*.55+.18,
+      h:Math.random()<.6?188:265
+    });
+    (function loop(){
+      cx.clearRect(0,0,W,H);
+      pts.forEach(p=>{
+        p.x+=p.vx; p.y+=p.vy;
+        if(p.y<-8){p.x=Math.random()*W; p.y=H+8;}
+        cx.beginPath(); cx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        cx.fillStyle=`hsla(${p.h},100%,70%,${p.a})`; cx.fill();
+      });
+      requestAnimationFrame(loop);
+    })();
+  })();
+
+  /* ═══════════════════════════════════════
+     3. CURSOR TRAIL  (canvas 2D)
+  ═══════════════════════════════════════ */
+  (function () {
+    const cv  = document.getElementById('trail-canvas');
+    const cx  = cv.getContext('2d');
+    const dot = document.getElementById('cursor-dot');
+    let W, H;
+
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+
+    // Particle pool
+    const MAX = 120;
+    const pool = [];  // { x, y, vx, vy, life, maxLife, r, hue, sat }
+
+    let mouseX = -999, mouseY = -999;
+
+    function spawnAt(x, y, n = 4) {
+      for (let i = 0; i < n; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 1.8 + 0.4;
+        const hue   = 185 + Math.random() * 40;    // cyan-ish range
+        const life  = 28 + Math.random() * 22;
+        pool.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.6,
+          life, maxLife: life,
+          r: Math.random() * 2.8 + 1.2,
+          hue, sat: 100
+        });
+        if (pool.length > MAX) pool.shift();
+      }
+    }
+
+    // Move cursor dot
+    function updateDot(x, y) {
+      dot.style.left = x + 'px';
+      dot.style.top  = y + 'px';
+    }
+
+    window.addEventListener('mousemove', e => {
+      mouseX = e.clientX; mouseY = e.clientY;
+      spawnAt(e.clientX, e.clientY, 5);
+      updateDot(e.clientX, e.clientY);
+    });
+
+    // Touch trail
+    window.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      spawnAt(t.clientX, t.clientY, 5);
+    }, { passive: true });
+
+    // Occasionally spawn electric sparks (larger, faster fade)
+    function spawnSpark(x, y) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 4 + 2;
+      pool.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 14 + Math.random() * 10,
+        maxLife: 14,
+        r: Math.random() * 1.5 + 0.5,
+        hue: 200 + Math.random() * 60,
+        sat: 100,
+        spark: true
+      });
+      if (pool.length > MAX) pool.shift();
+    }
+
+    let sparkTimer = 0;
+    (function loop(){
+      cx.clearRect(0, 0, W, H);
+      sparkTimer++;
+      if (sparkTimer % 3 === 0 && mouseX > 0) {
+        spawnSpark(mouseX + (Math.random()-0.5)*12, mouseY + (Math.random()-0.5)*12);
+      }
+
+      for (let i = pool.length - 1; i >= 0; i--) {
+        const p = pool[i];
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.vy += 0.04; // gentle gravity
+        p.vx *= 0.96;
+        p.life--;
+        if (p.life <= 0) { pool.splice(i, 1); continue; }
+
+        const t    = p.life / p.maxLife;
+        const alpha = p.spark ? t * 0.9 : t * 0.75;
+        const r    = p.r * (p.spark ? t * 0.7 : t);
+
+        // Glow
+        const grd = cx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.5);
+        grd.addColorStop(0,   `hsla(${p.hue},${p.sat}%,80%,${alpha})`);
+        grd.addColorStop(0.4, `hsla(${p.hue},${p.sat}%,65%,${alpha * 0.5})`);
+        grd.addColorStop(1,   'transparent');
+        cx.beginPath();
+        cx.arc(p.x, p.y, r * 3.5, 0, Math.PI * 2);
+        cx.fillStyle = grd;
+        cx.fill();
+
+        // Core
+        cx.beginPath();
+        cx.arc(p.x, p.y, Math.max(0.3, r * 0.6), 0, Math.PI * 2);
+        cx.fillStyle = `hsla(${p.hue},100%,90%,${alpha})`;
+        cx.fill();
+      }
+      requestAnimationFrame(loop);
+    })();
+  })();
+
+  /* ═══════════════════════════════════════
+     4. THREE.JS — SMALL IMAGE PANEL
+  ═══════════════════════════════════════ */
+  (function () {
+    const panel  = document.getElementById('canvas-panel');
+    const canvas = document.getElementById('three-canvas');
+
+    const scene    = new THREE.Scene();
+    // 900×600 → ratio 1.5
+    const camera   = new THREE.PerspectiveCamera(42, 1.5, 0.1, 100);
+    camera.position.z = 3;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+    const geo    = new THREE.PlaneGeometry(2.4, 1.6); // 1.5 ratio
+    const loader = new THREE.TextureLoader();
+    let mesh, animRunning = true;
+
+    function buildMesh(tex) {
+      if (THREE.SRGBColorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+      mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+      scene.add(mesh);
+    }
+
+    function fallback() {
+      const c = document.createElement('canvas'); c.width = 900; c.height = 600;
+      const g = c.getContext('2d');
+      const gr = g.createLinearGradient(0,0,900,600);
+      gr.addColorStop(0,'#0d1b2a'); gr.addColorStop(1,'#060a14');
+      g.fillStyle=gr; g.fillRect(0,0,900,600);
+      g.strokeStyle='rgba(0,245,255,0.3)'; g.lineWidth=1;
+      for(let i=0;i<14;i++){g.beginPath();g.moveTo(i*70,0);g.lineTo(0,i*70);g.stroke();}
+      g.fillStyle='#00f5ff'; g.font='bold 54px monospace';
+      g.textAlign='center'; g.textBaseline='middle';
+      g.fillText('🔐 SEGURIDAD', 450, 300);
+      return new THREE.CanvasTexture(c);
+    }
+
+    loader.load('imagenes/seguridad.png', buildMesh, undefined, () => buildMesh(fallback()));
+
+    function resize() {
+      const w = panel.clientWidth, h = panel.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resize(); window.addEventListener('resize', resize);
+
+    let t = 0;
+    function loop() {
+      if (!animRunning) return;
+      requestAnimationFrame(loop);
+      t += 0.007;
+      if (mesh) {
+        mesh.rotation.y = Math.sin(t * 0.55) * 0.15;
+        mesh.rotation.x = Math.sin(t * 0.38) * 0.06;
+        mesh.position.y = Math.sin(t * 0.42) * 0.055;
+      }
+      renderer.render(scene, camera);
+    }
+    loop();
+
+    // Click detection
+    const raycaster = new THREE.Raycaster();
+    const mv = new THREE.Vector2();
+
+    function getXY(e, useChanged) {
+      const rect  = canvas.getBoundingClientRect();
+      const touch = useChanged ? e.changedTouches[0] : (e.touches && e.touches[0]);
+      const cx2 = touch ? touch.clientX : e.clientX;
+      const cy2 = touch ? touch.clientY : e.clientY;
+      return { x: ((cx2-rect.left)/rect.width)*2-1, y: -((cy2-rect.top)/rect.height)*2+1 };
+    }
+
+    function tryOpen(e, useChanged) {
+      if (!mesh) return;
+      const { x, y } = getXY(e, useChanged);
+      mv.set(x, y);
+      raycaster.setFromCamera(mv, camera);
+      if (raycaster.intersectObject(mesh).length > 0) openExpanded();
+    }
+
+    canvas.addEventListener('click',    e => tryOpen(e, false));
+    canvas.addEventListener('touchend', e => { e.preventDefault(); tryOpen(e, true); }, { passive: false });
+
+    window._secPause  = () => { animRunning = false; };
+    window._secResume = () => { animRunning = true; loop(); };
+    window._secTex    = () => mesh ? mesh.material.map : null;
+  })();
+
+  /* ═══════════════════════════════════════
+     5. EXPANDED MODAL
+  ═══════════════════════════════════════ */
+  const overlay      = document.getElementById('overlay');
+  const expandedWrap = document.getElementById('expanded-wrap');
+  const expandedCvs  = document.getElementById('expanded-canvas');
+  const closeBtn     = document.getElementById('close-btn');
+
+  let expR, expS, expC, expM, expId;
+
+  function openExpanded() {
+    window._secPause();
+
+    if (!expR) {
+      expS = new THREE.Scene();
+      expC = new THREE.PerspectiveCamera(42, 1.5, 0.1, 100);
+      expC.position.z = 3;
+      expR = new THREE.WebGLRenderer({ canvas: expandedCvs, alpha: true, antialias: true });
+      expR.setPixelRatio(Math.min(devicePixelRatio, 2));
+      expS.add(new THREE.AmbientLight(0xffffff, 1.0));
+    }
+
+    const tex = window._secTex();
+    if (tex) {
+      if (expM) expS.remove(expM);
+      expM = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.4, 1.6),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+      );
+      expS.add(expM);
+      expM.rotation.set(0, 0, 0);
+    }
+
+    // Size: 900×600 → ratio 1.5
+    const maxW = innerWidth  * 0.86;
+    const maxH = innerHeight * 0.84;
+    let cw = maxW, ch = maxW / 1.5;
+    if (ch > maxH) { ch = maxH; cw = maxH * 1.5; }
+    expandedCvs.style.width  = cw + 'px';
+    expandedCvs.style.height = ch + 'px';
+    expR.setSize(cw, ch);
+    expC.aspect = cw / ch;
+    expC.updateProjectionMatrix();
+
+    overlay.classList.add('active');
+    expandedWrap.classList.add('active');
+    closeBtn.style.display = 'flex';
+
+    cancelAnimationFrame(expId);
+    (function loop(){ expId = requestAnimationFrame(loop); expR.render(expS, expC); })();
+  }
+
+  function closeExpanded() {
+    overlay.classList.remove('active');
+    expandedWrap.classList.remove('active');
+    closeBtn.style.display = 'none';
+    cancelAnimationFrame(expId);
+    window._secResume();
+  }
+
+  closeBtn.addEventListener('click', closeExpanded);
+  overlay.addEventListener('click',  closeExpanded);
+  </script>
+</body>
+</html>

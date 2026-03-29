@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Camino Backend — Slide 8</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:   #00f5ff;
+      --purple: #7b2fff;
+      --glow:   rgba(0,245,255,0.18);
+      --bg:     #03060f;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Exo 2', sans-serif;
+      color: #fff;
+      cursor: none;
+    }
+
+    /* ── Canvases ── */
+    #bg-canvas    { position: fixed; inset: 0; z-index: 0; }
+    #trail-canvas { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+
+    /* ── Scanlines ── */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom, transparent, transparent 3px,
+        rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px
+      );
+    }
+
+    /* ── Corners ── */
+    .corner { position: fixed; width: 24px; height: 24px; z-index: 10; pointer-events: none; }
+    .corner.tl { top:16px; left:16px;   border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.tr { top:16px; right:16px;  border-top:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+    .corner.bl { bottom:16px; left:16px;  border-bottom:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.br { bottom:16px; right:16px; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+
+    /* ── Custom cursor ── */
+    #cursor-dot {
+      position: fixed; z-index: 999; pointer-events: none;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 0 8px var(--cyan), 0 0 18px rgba(0,245,255,0.5);
+      transform: translate(-50%, -50%);
+    }
+
+    /* ════════════ SLIDE ════════════ */
+    #slide {
+      position: relative; z-index: 1;
+      width: 100%; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 1.2rem;
+      padding: 2vh 2vw 6vh;
+    }
+
+    /* ── Header chip + title ── */
+    .header {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 0.7rem;
+      text-align: center;
+      opacity: 0; animation: fadeUp 0.8s ease 0.2s forwards;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,245,255,0.07);
+      border: 1px solid rgba(0,245,255,0.3);
+      border-radius: 999px; padding: 5px 18px;
+      font-size: 0.7rem; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--cyan);
+    }
+    .chip-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+      animation: blink 1.8s ease-in-out infinite;
+    }
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.1rem, 2.2vw, 1.9rem);
+      font-weight: 900;
+    }
+    h1 .accent { color: var(--cyan); }
+
+    /* ── Canvas wrapper ── */
+    #canvas-wrap {
+      position: relative;
+      /* 676×603 → ratio ≈ 1.121 */
+      width:  min(62vh, 82vw);
+      height: min(55.3vh, 73.1vw); /* width / 1.121 */
+      opacity: 0;
+      animation: fadeUp 0.9s ease 0.5s forwards;
+    }
+    #three-canvas {
+      width: 100%; height: 100%;
+      display: block; cursor: none;
+      border-radius: 14px;
+      box-shadow:
+        0 0 40px rgba(0,0,0,0.75),
+        0 0 18px rgba(0,245,255,0.07),
+        0 24px 60px rgba(0,0,0,0.55);
+    }
+
+    /* glow ring around image */
+    .img-ring {
+      position: absolute; inset: -6px;
+      border-radius: 18px;
+      border: 1px solid rgba(0,245,255,0.15);
+      pointer-events: none;
+      box-shadow: 0 0 24px rgba(0,245,255,0.06) inset;
+    }
+
+    /* ── Overlay ── */
+    #overlay {
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(0,0,0,0); pointer-events: none;
+      transition: background 0.45s ease;
+    }
+    #overlay.active { background: rgba(0,0,0,0.8); pointer-events: auto; }
+
+    /* ── Expanded ── */
+    #expanded-wrap {
+      position: fixed; inset: 0; z-index: 95;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #expanded-wrap.active { pointer-events: auto; opacity: 1; }
+
+    #expanded-canvas {
+      border-radius: 14px;
+      box-shadow: 0 0 100px rgba(0,0,0,0.9), 0 0 35px rgba(0,245,255,0.07);
+      display: block; cursor: none;
+    }
+
+    /* ── Close btn ── */
+    #close-btn {
+      position: fixed; top: 24px; right: 28px; z-index: 100;
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 2px solid var(--cyan); background: rgba(3,6,15,0.85);
+      color: var(--cyan); font-size: 1.25rem;
+      cursor: none; display: none;
+      align-items: center; justify-content: center;
+      box-shadow: 0 0 16px var(--glow);
+      transition: background 0.2s, transform 0.2s;
+    }
+    #close-btn:hover { background: rgba(0,245,255,0.15); transform: scale(1.12); }
+
+    /* ── Nav ── */
+    .nav-arrow {
+      position: fixed; bottom: 32px; z-index: 50;
+      text-decoration: none;
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.5);
+      padding: 10px 20px;
+      border: 1px solid rgba(0,245,255,0.2); border-radius: 999px;
+      background: rgba(3,6,15,0.6); backdrop-filter: blur(8px);
+      transition: color .25s, border-color .25s, box-shadow .25s, transform .25s;
+    }
+    .nav-arrow:hover {
+      color: var(--cyan); border-color: var(--cyan);
+      box-shadow: 0 0 20px var(--glow); transform: translateY(-2px);
+    }
+    .nav-arrow .arrow { font-size: 1.2rem; }
+    #nav-prev { left: 32px; }
+    #nav-next { right: 32px; }
+
+    .slide-num {
+      position: fixed; bottom: 36px; left: 50%;
+      transform: translateX(-50%); z-index: 50;
+      font-family: 'Orbitron', sans-serif; font-size: 0.7rem;
+      letter-spacing: 0.2em; color: rgba(255,255,255,0.25);
+    }
+
+    /* ── Keyframes ── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(18px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes blink {
+      0%,100% { opacity:1; } 50% { opacity:0.3; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      html, body { overflow-y: auto; cursor: auto; }
+      #cursor-dot { display: none; }
+      #slide { padding: 5vh 4vw 10vh; gap: 1rem; }
+      #canvas-wrap {
+        width: 92vw;
+        height: calc(92vw / 1.121);
+      }
+      h1 { font-size: clamp(0.95rem, 4vw, 1.4rem); }
+      .slide-num { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="bg-canvas"></canvas>
+  <canvas id="trail-canvas"></canvas>
+  <div id="cursor-dot"></div>
+  <div class="scanlines"></div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+
+  <div id="slide">
+
+    <!-- Title -->
+    <div class="header">
+      <div class="chip"><span class="chip-dot"></span>Slide 08 — Ruta de aprendizaje</div>
+      <h1>🧭 Camino para aprender <span class="accent">Backend</span></h1>
+    </div>
+
+    <!-- Main image -->
+    <div id="canvas-wrap">
+      <canvas id="three-canvas"></canvas>
+      <div class="img-ring"></div>
+    </div>
+
+  </div>
+
+  <!-- Overlay + Expanded -->
+  <div id="overlay"></div>
+  <div id="expanded-wrap">
+    <canvas id="expanded-canvas"></canvas>
+  </div>
+  <button id="close-btn" title="Cerrar">✕</button>
+
+  <!-- Nav -->
+  <a href="index7.html" class="nav-arrow" id="nav-prev"><span class="arrow">←</span> Anterior</a>
+  <a href="index9.html" class="nav-arrow" id="nav-next">Siguiente <span class="arrow">→</span></a>
+  <div class="slide-num">08 / 09</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+  /* ═══════════════════════════════════════
+     1. PARTICLE BACKGROUND
+  ═══════════════════════════════════════ */
+  (function () {
+    const cv = document.getElementById('bg-canvas');
+    const cx = cv.getContext('2d');
+    let W, H, pts = [];
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+    for (let i = 0; i < 160; i++) pts.push({
+      x: Math.random()*W, y: Math.random()*H,
+      vx:(Math.random()-.5)*.26, vy:-(Math.random()*.5+.16),
+      r: Math.random()*1.2+.3,  a: Math.random()*.5+.15,
+      h: Math.random()<.6 ? 188 : 265
+    });
+    (function loop(){
+      cx.clearRect(0,0,W,H);
+      pts.forEach(p => {
+        p.x+=p.vx; p.y+=p.vy;
+        if (p.y<-8) { p.x=Math.random()*W; p.y=H+8; }
+        cx.beginPath(); cx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        cx.fillStyle=`hsla(${p.h},100%,70%,${p.a})`; cx.fill();
+      });
+      requestAnimationFrame(loop);
+    })();
+  })();
+
+  /* ═══════════════════════════════════════
+     2. SMOKE / GLOW CURSOR TRAIL
+  ═══════════════════════════════════════ */
+  (function () {
+    const cv  = document.getElementById('trail-canvas');
+    const cx  = cv.getContext('2d');
+    const dot = document.getElementById('cursor-dot');
+    let W, H;
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+
+    const MAX  = 140;
+    const pool = [];
+    let mx = -999, my = -999;
+
+    // Smoke puff palette — soft blues, white, faint cyan
+    function smokeColor() {
+      const t = Math.random();
+      if (t < 0.45) return { h: 195 + Math.random()*25, s: 80,  l: 75 }; // cyan-blue
+      if (t < 0.75) return { h: 210 + Math.random()*30, s: 40,  l: 88 }; // pale blue-white
+      return             { h: 188 + Math.random()*15,  s: 100, l: 65 }; // pure cyan
+    }
+
+    function spawn(x, y) {
+      const c     = smokeColor();
+      const angle = (Math.random() * Math.PI * 2);
+      const speed = Math.random() * 0.9 + 0.2;
+      const life  = 55 + Math.random() * 45;
+      pool.push({
+        x: x + (Math.random()-0.5)*6,
+        y: y + (Math.random()-0.5)*6,
+        vx: Math.cos(angle)*speed * 0.4,
+        vy: Math.sin(angle)*speed * 0.4 - 0.25,  // gentle upward drift
+        life, maxLife: life,
+        r: Math.random() * 10 + 6,               // large soft puffs
+        h: c.h, s: c.s, l: c.l,
+        expand: 0.08 + Math.random()*0.06         // radius grows over time
+      });
+      if (pool.length > MAX) pool.shift();
+    }
+
+    // Tiny bright core spark
+    function spawnCore(x, y) {
+      pool.push({
+        x, y, vx:0, vy:-0.4,
+        life: 18, maxLife: 18,
+        r: 2.5, h: 195, s: 100, l: 92,
+        expand: 0, core: true
+      });
+      if (pool.length > MAX) pool.shift();
+    }
+
+    window.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      spawn(e.clientX, e.clientY);
+      if (Math.random() < 0.4) spawnCore(e.clientX, e.clientY);
+      dot.style.left = e.clientX+'px';
+      dot.style.top  = e.clientY+'px';
+    });
+    window.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      mx = t.clientX; my = t.clientY;
+      spawn(t.clientX, t.clientY);
+    }, { passive: true });
+
+    (function loop(){
+      cx.clearRect(0,0,W,H);
+
+      for (let i = pool.length-1; i >= 0; i--) {
+        const p = pool[i];
+        p.vx *= 0.98; p.vy *= 0.98;
+        p.x  += p.vx; p.y  += p.vy;
+        p.life--;
+        if (p.life <= 0) { pool.splice(i,1); continue; }
+
+        const prog  = p.life / p.maxLife;   // 1→0 as dying
+        const alpha = p.core
+          ? prog * 0.95
+          : Math.pow(prog, 0.6) * 0.22;     // very soft for smoke puffs
+
+        const curR = p.core ? p.r : p.r + (1-prog) * p.r * p.expand * 30;
+
+        if (p.core) {
+          // Bright little dot with tight glow
+          const grd = cx.createRadialGradient(p.x,p.y,0, p.x,p.y, curR*4);
+          grd.addColorStop(0,   `hsla(${p.h},${p.s}%,${p.l}%,${alpha})`);
+          grd.addColorStop(0.5, `hsla(${p.h},${p.s}%,${p.l}%,${alpha*0.3})`);
+          grd.addColorStop(1,   'transparent');
+          cx.beginPath(); cx.arc(p.x,p.y,curR*4,0,Math.PI*2);
+          cx.fillStyle = grd; cx.fill();
+        } else {
+          // Large diffuse smoke puff
+          const grd = cx.createRadialGradient(p.x,p.y,0, p.x,p.y, curR);
+          grd.addColorStop(0,   `hsla(${p.h},${p.s}%,${p.l}%,${alpha})`);
+          grd.addColorStop(0.45,`hsla(${p.h},${p.s*0.6}%,${p.l}%,${alpha*0.45})`);
+          grd.addColorStop(1,   'transparent');
+          cx.beginPath(); cx.arc(p.x,p.y,curR,0,Math.PI*2);
+          cx.fillStyle = grd; cx.fill();
+        }
+      }
+      requestAnimationFrame(loop);
+    })();
+  })();
+
+  /* ═══════════════════════════════════════
+     3. THREE.JS — CENTERED IMAGE
+  ═══════════════════════════════════════ */
+  (function () {
+    const wrap   = document.getElementById('canvas-wrap');
+    const canvas = document.getElementById('three-canvas');
+
+    const scene  = new THREE.Scene();
+    // 676×603 → ratio ≈ 1.121
+    const RATIO  = 676 / 603;
+    const camera = new THREE.PerspectiveCamera(42, RATIO, 0.1, 100);
+    camera.position.z = 3;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+    // Plane keeps 676:603 aspect
+    const PH = 1.8, PW = PH * RATIO;
+    const geo = new THREE.PlaneGeometry(PW, PH);
+    const loader = new THREE.TextureLoader();
+    let mesh, animOn = true;
+
+    function buildMesh(tex) {
+      if (THREE.SRGBColorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+      mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+      scene.add(mesh);
+    }
+
+    function fallback() {
+      const c = document.createElement('canvas'); c.width = 676; c.height = 603;
+      const g = c.getContext('2d');
+      const gr = g.createLinearGradient(0,0,676,603);
+      gr.addColorStop(0,'#0d1b2a'); gr.addColorStop(1,'#060a14');
+      g.fillStyle=gr; g.fillRect(0,0,676,603);
+      // Grid
+      g.strokeStyle='rgba(0,245,255,0.2)'; g.lineWidth=1;
+      for(let i=0;i<12;i++){g.beginPath();g.moveTo(i*60,0);g.lineTo(0,i*60);g.stroke();}
+      // Label
+      g.fillStyle='#00f5ff'; g.font='bold 44px monospace';
+      g.textAlign='center'; g.textBaseline='middle';
+      g.fillText('🧭 ROADMAP', 338, 301);
+      return new THREE.CanvasTexture(c);
+    }
+
+    loader.load('imagenes/camino2.jpg', buildMesh, undefined, () => buildMesh(fallback()));
+
+    function resize() {
+      const w = wrap.clientWidth, h = wrap.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    let t = 0;
+    function loop() {
+      if (!animOn) return;
+      requestAnimationFrame(loop);
+      t += 0.007;
+      if (mesh) {
+        mesh.rotation.y = Math.sin(t * 0.5)  * 0.12;
+        mesh.rotation.x = Math.sin(t * 0.35) * 0.05;
+        mesh.position.y = Math.sin(t * 0.4)  * 0.05;
+      }
+      renderer.render(scene, camera);
+    }
+    loop();
+
+    // Raycaster
+    const raycaster = new THREE.Raycaster();
+    const mv = new THREE.Vector2();
+
+    function getXY(e, useChanged) {
+      const rect  = canvas.getBoundingClientRect();
+      const touch = useChanged ? e.changedTouches[0] : (e.touches && e.touches[0]);
+      const cx2 = touch ? touch.clientX : e.clientX;
+      const cy2 = touch ? touch.clientY : e.clientY;
+      return { x:((cx2-rect.left)/rect.width)*2-1, y:-((cy2-rect.top)/rect.height)*2+1 };
+    }
+
+    function tryOpen(e, uc) {
+      if (!mesh) return;
+      const {x,y} = getXY(e, uc);
+      mv.set(x,y);
+      raycaster.setFromCamera(mv, camera);
+      if (raycaster.intersectObject(mesh).length > 0) openExpanded();
+    }
+
+    canvas.addEventListener('click',    e => tryOpen(e, false));
+    canvas.addEventListener('touchend', e => { e.preventDefault(); tryOpen(e, true); }, { passive: false });
+
+    window._pathPause  = () => { animOn = false; };
+    window._pathResume = () => { animOn = true; loop(); };
+    window._pathTex    = () => mesh ? mesh.material.map : null;
+    window._pathRatio  = () => RATIO;
+  })();
+
+  /* ═══════════════════════════════════════
+     4. EXPANDED MODAL
+  ═══════════════════════════════════════ */
+  const overlay      = document.getElementById('overlay');
+  const expandedWrap = document.getElementById('expanded-wrap');
+  const expandedCvs  = document.getElementById('expanded-canvas');
+  const closeBtn     = document.getElementById('close-btn');
+  let expR, expS, expC, expM, expId;
+
+  function openExpanded() {
+    window._pathPause();
+
+    if (!expR) {
+      expS = new THREE.Scene();
+      expC = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+      expC.position.z = 3;
+      expR = new THREE.WebGLRenderer({ canvas: expandedCvs, alpha: true, antialias: true });
+      expR.setPixelRatio(Math.min(devicePixelRatio, 2));
+      expS.add(new THREE.AmbientLight(0xffffff, 1.0));
+    }
+
+    const tex   = window._pathTex();
+    const ratio = window._pathRatio(); // 676/603 ≈ 1.121
+
+    if (tex) {
+      if (expM) expS.remove(expM);
+      const PH = 1.8, PW = PH * ratio;
+      expM = new THREE.Mesh(
+        new THREE.PlaneGeometry(PW, PH),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide })
+      );
+      expS.add(expM);
+      expM.rotation.set(0,0,0);
+    }
+
+    // Size canvas: keep ratio, fit within viewport with generous padding
+    const maxW = innerWidth  * 0.84;
+    const maxH = innerHeight * 0.84;
+    const ratio2 = 676/603;
+    let cw = maxW, ch = maxW / ratio2;
+    if (ch > maxH) { ch = maxH; cw = maxH * ratio2; }
+
+    expandedCvs.style.width  = cw + 'px';
+    expandedCvs.style.height = ch + 'px';
+    expR.setSize(cw, ch);
+    expC.aspect = cw / ch;
+    expC.updateProjectionMatrix();
+
+    overlay.classList.add('active');
+    expandedWrap.classList.add('active');
+    closeBtn.style.display = 'flex';
+
+    cancelAnimationFrame(expId);
+    (function loop(){ expId = requestAnimationFrame(loop); expR.render(expS, expC); })();
+  }
+
+  function closeExpanded() {
+    overlay.classList.remove('active');
+    expandedWrap.classList.remove('active');
+    closeBtn.style.display = 'none';
+    cancelAnimationFrame(expId);
+    window._pathResume();
+  }
+
+  closeBtn.addEventListener('click', closeExpanded);
+  overlay.addEventListener('click',  closeExpanded);
+  </script>
+</body>
+</html>
