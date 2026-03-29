@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tecnologías Backend — Slide 4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:   #00f5ff;
+      --purple: #7b2fff;
+      --green:  #00ff9d;
+      --glow:   rgba(0,245,255,0.18);
+      --bg:     #03060f;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Exo 2', sans-serif;
+      color: #fff;
+    }
+
+    /* ── Particle BG ── */
+    #bg-canvas { position: fixed; inset: 0; z-index: 0; }
+
+    /* ── Scanlines ── */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom, transparent, transparent 3px,
+        rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px
+      );
+    }
+
+    /* ── Corners ── */
+    .corner { position: fixed; width: 24px; height: 24px; z-index: 10; pointer-events: none; }
+    .corner.tl { top:16px; left:16px;   border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.tr { top:16px; right:16px;  border-top:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+    .corner.bl { bottom:16px; left:16px;  border-bottom:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.br { bottom:16px; right:16px; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+
+    /* ── Layout ── */
+    #slide {
+      position: relative; z-index: 1;
+      width: 100%; height: 100vh;
+      display: flex; align-items: stretch;
+    }
+
+    /* ══════════════════════
+       LEFT — Text
+    ══════════════════════ */
+    #text-panel {
+      width: 50%;
+      padding: 4vh 3vw 4vh 6vw;
+      display: flex; flex-direction: column;
+      justify-content: center; gap: 1.1rem;
+      overflow: hidden;
+    }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,245,255,0.07);
+      border: 1px solid rgba(0,245,255,0.3);
+      border-radius: 999px; padding: 5px 16px;
+      font-size: 0.7rem; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--cyan);
+      width: fit-content;
+      opacity: 0; animation: fadeUp 0.7s ease 0.2s forwards;
+    }
+    .chip-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+      animation: blink 1.8s ease-in-out infinite;
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.3rem, 2.3vw, 2rem);
+      font-weight: 900; line-height: 1.15;
+      opacity: 0; animation: fadeUp 0.7s ease 0.35s forwards;
+    }
+    h1 .accent { color: var(--cyan); }
+
+    .divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      border-radius: 2px;
+      opacity: 0; animation: fadeUp 0.7s ease 0.45s forwards;
+    }
+
+    /* ── Two-column tech grid ── */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.9rem 1.4rem;
+    }
+
+    .tech-col {}
+
+    .tech-subtitle {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.68rem; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--cyan);
+      margin-bottom: 0.55rem;
+      opacity: 0;
+    }
+    .tech-subtitle.visible { animation: fadeUp 0.55s ease forwards; }
+
+    .tech-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 6px 10px; border-radius: 6px;
+      border: 1px solid rgba(0,245,255,0.0);
+      background: rgba(255,255,255,0.02);
+      font-size: clamp(0.72rem, 1.1vw, 0.86rem);
+      font-weight: 400; color: rgba(255,255,255,0.82);
+      opacity: 0; transform: translateX(-20px);
+      transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+      cursor: default;
+    }
+    .tech-item.visible {
+      animation: slideGlow 0.5s cubic-bezier(.23,1,.32,1) forwards;
+    }
+    .tech-item:hover {
+      border-color: rgba(0,245,255,0.22);
+      background: rgba(0,245,255,0.05);
+      box-shadow: 0 0 14px rgba(0,245,255,0.07);
+    }
+    .tech-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    }
+    .tech-item strong { color: var(--cyan); font-weight: 600; }
+
+    /* ══════════════════════
+       RIGHT — Three.js
+    ══════════════════════ */
+    #canvas-panel {
+      width: 50%; height: 100vh; position: relative;
+    }
+    #three-canvas { width: 100%; height: 100%; display: block; cursor: pointer; }
+
+    /* ── Overlay ── */
+    #overlay {
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(0,0,0,0); pointer-events: none;
+      transition: background 0.4s ease;
+    }
+    #overlay.active { background: rgba(0,0,0,0.75); pointer-events: auto; }
+
+    /* ── Expanded canvas ── */
+    #expanded-wrap {
+      position: fixed; inset: 0; z-index: 95;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #expanded-wrap.active { pointer-events: auto; opacity: 1; }
+    #expanded-canvas {
+      width: min(84vw, 84vh); height: min(56vw, 56vh);
+      border-radius: 12px;
+      box-shadow: 0 0 80px rgba(0,0,0,0.9), 0 0 30px rgba(0,245,255,0.06);
+      display: block; cursor: default;
+    }
+
+    /* ── Close btn ── */
+    #close-btn {
+      position: fixed; top: 24px; right: 28px; z-index: 100;
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 2px solid var(--cyan); background: rgba(3,6,15,0.85);
+      color: var(--cyan); font-size: 1.25rem;
+      cursor: pointer; display: none;
+      align-items: center; justify-content: center;
+      box-shadow: 0 0 16px var(--glow);
+      transition: background 0.2s, transform 0.2s;
+    }
+    #close-btn:hover { background: rgba(0,245,255,0.15); transform: scale(1.12); }
+
+    /* ── Nav arrows ── */
+    .nav-arrow {
+      position: fixed; bottom: 32px; z-index: 50;
+      text-decoration: none;
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.5);
+      padding: 10px 20px;
+      border: 1px solid rgba(0,245,255,0.2); border-radius: 999px;
+      background: rgba(3,6,15,0.6); backdrop-filter: blur(8px);
+      transition: color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+    }
+    .nav-arrow:hover {
+      color: var(--cyan); border-color: var(--cyan);
+      box-shadow: 0 0 20px var(--glow); transform: translateY(-2px);
+    }
+    .nav-arrow .arrow { font-size: 1.2rem; }
+    #nav-prev { left: 32px; }
+    #nav-next { right: 32px; }
+
+    .slide-num {
+      position: fixed; bottom: 36px; left: 50%;
+      transform: translateX(-50%); z-index: 50;
+      font-family: 'Orbitron', sans-serif; font-size: 0.7rem;
+      letter-spacing: 0.2em; color: rgba(255,255,255,0.25);
+    }
+
+    /* ── Keyframes ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideGlow {
+      0%   { opacity: 0; transform: translateX(-20px); box-shadow: none; }
+      55%  { box-shadow: 0 0 18px rgba(0,245,255,0.2); }
+      100% { opacity: 1; transform: translateX(0); box-shadow: none; }
+    }
+    @keyframes blink {
+      0%,100% { opacity:1; } 50% { opacity:0.3; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      html, body { overflow-y: auto; }
+      #slide { flex-direction: column; height: auto; min-height: 100vh; }
+      #text-panel { width: 100%; padding: 5vh 5vw 2vh; gap: 0.9rem; }
+      #canvas-panel { width: 100%; height: 55vw; min-height: 240px; }
+      .tech-grid { grid-template-columns: 1fr; gap: 0.7rem; }
+      h1 { font-size: clamp(1rem, 4vw, 1.4rem); }
+      .slide-num { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="bg-canvas"></canvas>
+  <div class="scanlines"></div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+
+  <div id="slide">
+
+    <!-- LEFT: Text -->
+    <div id="text-panel">
+      <div class="chip"><span class="chip-dot"></span>Slide 04 — Tecnologías</div>
+
+      <h1>🌐 Tecnologías<br/><span class="accent">Backend</span></h1>
+      <div class="divider"></div>
+
+      <div class="tech-grid">
+
+        <!-- Column 1: Languages -->
+        <div class="tech-col">
+          <div class="tech-subtitle" id="sub1">Lenguajes más usados:</div>
+          <div class="tech-item" style="--dot:#f7df1e"><span class="tech-dot" style="background:#f7df1e;box-shadow:0 0 6px #f7df1e"></span><strong>JavaScript</strong> (Node.js)</div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#3776ab;box-shadow:0 0 6px #3776ab"></span><strong>Python</strong></div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#f89820;box-shadow:0 0 6px #f89820"></span><strong>Java</strong></div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#8892be;box-shadow:0 0 6px #8892be"></span><strong>PHP</strong></div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#9b4f96;box-shadow:0 0 6px #9b4f96"></span><strong>C#</strong></div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#00acd7;box-shadow:0 0 6px #00acd7"></span><strong>Go</strong></div>
+        </div>
+
+        <!-- Column 2: Frameworks -->
+        <div class="tech-col">
+          <div class="tech-subtitle" id="sub2">Frameworks populares:</div>
+          <div class="tech-item"><span class="tech-dot" style="background:#68a063;box-shadow:0 0 6px #68a063"></span><strong>Express.js</strong> (Node.js)</div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#0c4b33;box-shadow:0 0 6px #2ba063"></span><strong>Django / Flask</strong></div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#6db33f;box-shadow:0 0 6px #6db33f"></span><strong>Spring Boot</strong></div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#ff2d20;box-shadow:0 0 6px #ff2d20"></span><strong>Laravel</strong></div>
+          <div class="tech-item" style="margin-top:5px"><span class="tech-dot" style="background:#512bd4;box-shadow:0 0 6px #512bd4"></span><strong>ASP.NET</strong></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RIGHT: Three.js -->
+    <div id="canvas-panel">
+      <canvas id="three-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Overlay + Expanded -->
+  <div id="overlay"></div>
+  <div id="expanded-wrap">
+    <canvas id="expanded-canvas"></canvas>
+  </div>
+  <button id="close-btn" title="Cerrar">✕</button>
+
+  <!-- Nav -->
+  <a href="index3.html" class="nav-arrow" id="nav-prev"><span class="arrow">←</span> Anterior</a>
+  <a href="index5.html" class="nav-arrow" id="nav-next">Siguiente <span class="arrow">→</span></a>
+  <div class="slide-num">04 / 05</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+  /* ═══════════════════════════════
+     1. STAGGERED TEXT ANIMATION
+  ═══════════════════════════════ */
+  (function () {
+    const sub1   = document.getElementById('sub1');
+    const sub2   = document.getElementById('sub2');
+    const items  = document.querySelectorAll('.tech-item');
+    const col1   = document.querySelectorAll('.tech-col:first-child .tech-item');
+    const col2   = document.querySelectorAll('.tech-col:last-child  .tech-item');
+
+    setTimeout(() => { sub1.classList.add('visible'); }, 700);
+    setTimeout(() => { sub2.classList.add('visible'); }, 700);
+
+    col1.forEach((el, i) => setTimeout(() => el.classList.add('visible'), 900  + i * 220));
+    col2.forEach((el, i) => setTimeout(() => el.classList.add('visible'), 1000 + i * 220));
+  })();
+
+  /* ═══════════════════════════════
+     2. PARTICLE BACKGROUND
+  ═══════════════════════════════ */
+  (function () {
+    const cv = document.getElementById('bg-canvas');
+    const cx = cv.getContext('2d');
+    let W, H, pts = [];
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+    for (let i = 0; i < 170; i++) pts.push({
+      x: Math.random()*W, y: Math.random()*H,
+      vx:(Math.random()-.5)*.28, vy:-(Math.random()*.55+.18),
+      r:Math.random()*1.3+.3, a:Math.random()*.55+.18,
+      h:Math.random()<.6?188:265
+    });
+    (function loop(){
+      cx.clearRect(0,0,W,H);
+      pts.forEach(p=>{
+        p.x+=p.vx; p.y+=p.vy;
+        if(p.y<-8){p.x=Math.random()*W; p.y=H+8;}
+        cx.beginPath(); cx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        cx.fillStyle=`hsla(${p.h},100%,70%,${p.a})`; cx.fill();
+      });
+      requestAnimationFrame(loop);
+    })();
+  })();
+
+  /* ═══════════════════════════════
+     3. THREE.JS — SMALL PANEL
+  ═══════════════════════════════ */
+  (function () {
+    const panel  = document.getElementById('canvas-panel');
+    const canvas = document.getElementById('three-canvas');
+
+    const scene    = new THREE.Scene();
+    const camera   = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.z = 3;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+    // Pure white light — image shown as-is
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+    // Plane sized for 1536×1024 → ratio 3:2
+    const geo    = new THREE.PlaneGeometry(2.4, 1.6);
+    const loader = new THREE.TextureLoader();
+    let mesh;
+
+    function buildMesh(tex) {
+      if (THREE.SRGBColorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+      mesh = new THREE.Mesh(geo, mat);
+      scene.add(mesh);
+    }
+
+    function fallbackTex() {
+      const c = document.createElement('canvas'); c.width = 768; c.height = 512;
+      const g = c.getContext('2d');
+      const gr = g.createLinearGradient(0,0,768,512);
+      gr.addColorStop(0,'#0d1b2a'); gr.addColorStop(1,'#0a0a1a');
+      g.fillStyle = gr; g.fillRect(0,0,768,512);
+      g.strokeStyle='rgba(0,245,255,0.4)'; g.lineWidth=1;
+      for(let i=0;i<12;i++){g.beginPath();g.moveTo(i*70,0);g.lineTo(0,i*70);g.stroke();}
+      g.fillStyle='#00f5ff'; g.font='bold 52px monospace';
+      g.textAlign='center'; g.fillText('TECNOLOGÍAS',384,200);
+      g.font='30px monospace'; g.fillStyle='rgba(255,255,255,0.6)';
+      g.fillText('Node · Python · Java · PHP · Go',384,270);
+      return new THREE.CanvasTexture(c);
+    }
+
+    loader.load('imagenes/tecnologias.png', buildMesh, undefined, () => buildMesh(fallbackTex()));
+
+    function resize() {
+      const w = panel.clientWidth, h = panel.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resize(); window.addEventListener('resize', resize);
+
+    // Auto-rotate idle
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.008;
+      if (mesh) {
+        mesh.rotation.y = Math.sin(t * 0.6) * 0.18;
+        mesh.rotation.x = Math.sin(t * 0.45) * 0.07;
+        mesh.position.y = Math.sin(t * 0.5) * 0.06;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Click detection
+    const raycaster = new THREE.Raycaster();
+    const mouse     = new THREE.Vector2();
+
+    function getXY(e, useChanged) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = useChanged ? e.changedTouches[0] : (e.touches && e.touches[0]);
+      const cx = touch ? touch.clientX : e.clientX;
+      const cy = touch ? touch.clientY : e.clientY;
+      return { x: ((cx-rect.left)/rect.width)*2-1, y: -((cy-rect.top)/rect.height)*2+1 };
+    }
+
+    function tryOpen(e, useChanged) {
+      if (!mesh) return;
+      const { x, y } = getXY(e, useChanged);
+      mouse.set(x, y);
+      raycaster.setFromCamera(mouse, camera);
+      if (raycaster.intersectObject(mesh).length > 0) openExpanded();
+    }
+
+    canvas.addEventListener('click',    e => tryOpen(e, false));
+    canvas.addEventListener('touchend', e => { e.preventDefault(); tryOpen(e, true); }, { passive: false });
+
+    window._techGetTexture = () => mesh ? mesh.material.map : null;
+  })();
+
+  /* ═══════════════════════════════
+     4. EXPANDED VIEWER
+  ═══════════════════════════════ */
+  const overlay      = document.getElementById('overlay');
+  const expandedWrap = document.getElementById('expanded-wrap');
+  const expandedCvs  = document.getElementById('expanded-canvas');
+  const closeBtn     = document.getElementById('close-btn');
+
+  let expScene, expCamera, expRenderer, expMesh, expAnimId;
+
+  function openExpanded() {
+    if (!expRenderer) {
+      expScene  = new THREE.Scene();
+      expCamera = new THREE.PerspectiveCamera(42, 1.5, 0.1, 100);
+      expCamera.position.z = 3;
+      expRenderer = new THREE.WebGLRenderer({ canvas: expandedCvs, alpha: true, antialias: true });
+      expRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      expScene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    }
+
+    const tex = window._techGetTexture();
+    if (tex && (!expMesh || expMesh.material.map !== tex)) {
+      if (expMesh) expScene.remove(expMesh);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+      // 3:2 plane
+      expMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 2.0), mat);
+      expScene.add(expMesh);
+    }
+
+    // Size canvas respecting 3:2 ratio
+    const maxW = window.innerWidth  * 0.84;
+    const maxH = window.innerHeight * 0.84;
+    let cw = maxW, ch = maxW / 1.5;
+    if (ch > maxH) { ch = maxH; cw = maxH * 1.5; }
+    expandedCvs.style.width  = cw + 'px';
+    expandedCvs.style.height = ch + 'px';
+    expRenderer.setSize(cw, ch);
+    expCamera.aspect = cw / ch;
+    expCamera.updateProjectionMatrix();
+
+    if (expMesh) { expMesh.rotation.set(0,0,0); }
+
+    overlay.classList.add('active');
+    expandedWrap.classList.add('active');
+    closeBtn.style.display = 'flex';
+
+    cancelAnimationFrame(expAnimId);
+    (function loop() {
+      expAnimId = requestAnimationFrame(loop);
+      expRenderer.render(expScene, expCamera);
+    })();
+  }
+
+  function closeExpanded() {
+    overlay.classList.remove('active');
+    expandedWrap.classList.remove('active');
+    closeBtn.style.display = 'none';
+    cancelAnimationFrame(expAnimId);
+  }
+
+  closeBtn.addEventListener('click', closeExpanded);
+  overlay.addEventListener('click',  closeExpanded);
+  </script>
+</body>
+</html>
