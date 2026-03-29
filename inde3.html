@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backend Development</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Share Tech Mono', monospace;
+    cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; }
+
+  #overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 10;
+  }
+
+  #title-block {
+    position: absolute; bottom: 12%; left: 50%;
+    transform: translateX(-50%); text-align: center;
+    opacity: 0; animation: fadeSlideUp 1.4s ease forwards 0.8s;
+  }
+  #main-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.6rem, 4vw, 3.2rem);
+    font-weight: 900; letter-spacing: 0.25em; color: #fff;
+    text-shadow: 0 0 10px #00f5ff, 0 0 30px #00f5ff88, 0 0 60px #00f5ff44;
+  }
+  #sub-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.7rem, 1.6vw, 1.1rem);
+    letter-spacing: 0.18em; color: #00f5ff99; margin-top: 0.5rem;
+    text-shadow: 0 0 8px #00f5ff66;
+  }
+
+  #scan-line {
+    position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, #00f5ff44, #00f5ffaa, #00f5ff44, transparent);
+    animation: scan 6s linear infinite; opacity: 0.35;
+  }
+
+  #corner-tl,#corner-tr,#corner-bl,#corner-br { position:absolute; width:32px; height:32px; opacity:0.55; }
+  #corner-tl { top:18px; left:18px; border-top:2px solid #00f5ff; border-left:2px solid #00f5ff; }
+  #corner-tr { top:18px; right:18px; border-top:2px solid #00f5ff; border-right:2px solid #00f5ff; }
+  #corner-bl { bottom:18px; left:18px; border-bottom:2px solid #00f5ff; border-left:2px solid #00f5ff; }
+  #corner-br { bottom:18px; right:18px; border-bottom:2px solid #00f5ff; border-right:2px solid #00f5ff; }
+
+  .escudo {
+    position: absolute;
+    top: 18px;
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    opacity: 0;
+    animation: fadeSlideUp 1s ease forwards 1s;
+    filter: drop-shadow(0 0 6px #00f5ff55);
+  }
+  #escudo-izq { left: 62px; }
+  #escudo-der {
+  position: absolute;
+  right: 10px;
+  top: 18px;
+}
+
+  .hud-tag {
+    position:absolute; font-size:0.6rem; letter-spacing:0.15em; color:#00f5ff55;
+    opacity:0; animation: fadeSlideUp 1s ease forwards 1.5s;
+  }
+  #hud-tl { top:56px; left:22px; }
+  #hud-tr { top:56px; right:22px; text-align:right; }
+  .stat-bar { display:flex; align-items:center; gap:6px; margin-top:3px; }
+  .stat-label { font-size:0.55rem; color:#00f5ff44; width:60px; }
+  .stat-track { width:80px; height:2px; background:#00f5ff11; border-radius:2px; overflow:hidden; }
+  .stat-fill { height:100%; background:#00f5ff; border-radius:2px; animation:fillBar 2s ease forwards 2s; }
+
+  #close-btn {
+    position: fixed; top: 22px; right: 22px;
+    width: 44px; height: 44px;
+    border: 1.5px solid #00f5ff88; background: rgba(0,10,20,0.7);
+    color: #00f5ff; font-size: 1.1rem; font-family: 'Orbitron', monospace;
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    z-index: 100; pointer-events: all; transition: all 0.2s ease;
+    clip-path: polygon(8px 0%,100% 0%,100% calc(100% - 8px),calc(100% - 8px) 100%,0% 100%,0% 8px);
+  }
+  #close-btn:hover { background: rgba(0,245,255,0.15); border-color: #00f5ff; box-shadow: 0 0 14px #00f5ff66; }
+
+  #drag-hint {
+    position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+    font-size: 0.58rem; letter-spacing: 0.16em; color: #00f5ff55;
+    z-index: 90; pointer-events: none; opacity: 0; transition: opacity 0.6s ease;
+    font-family: 'Share Tech Mono', monospace; white-space: nowrap;
+  }
+
+  #hint {
+    position: absolute; bottom: 5%; left: 50%; transform: translateX(-50%);
+    font-size: 0.6rem; letter-spacing: 0.18em; color: #00f5ff33;
+    opacity: 0;
+    animation: fadeSlideUp 1s ease forwards 2.5s, pulse 3s ease-in-out infinite 3s;
+    white-space: nowrap;
+  }
+
+  @keyframes fadeSlideUp {
+    from { opacity:0; transform: translateX(-50%) translateY(14px); }
+    to   { opacity:1; transform: translateX(-50%) translateY(0); }
+  }
+  @keyframes scan { 0% { top:-2px; } 100% { top:100%; } }
+  @keyframes fillBar { from { width:0; } to { width:var(--w,70%); } }
+  @keyframes pulse { 0%,100% { opacity:.25; } 50% { opacity:.55; } }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="overlay">
+  <div id="scan-line"></div>
+  <div id="corner-tl"></div><div id="corner-tr"></div>
+  <div id="corner-bl"></div><div id="corner-br"></div>
+  <img src="imagenes/infor.png"  class="escudo" id="escudo-izq" alt="Escudo carrera" >
+  <img src="imagenes/unsxx2.png" class="escudo" id="escudo-der" alt="Escudo universidad">
+  <div class="hud-tag" id="hud-tl">
+    SYS_STATUS: ONLINE<br>NODE v22.4.1 // EXPRESS 5.x
+    <div class="stat-bar"><span class="stat-label">CPU</span><div class="stat-track"><div class="stat-fill" style="--w:62%"></div></div></div>
+    <div class="stat-bar"><span class="stat-label">RAM</span><div class="stat-track"><div class="stat-fill" style="--w:81%"></div></div></div>
+    <div class="stat-bar"><span class="stat-label">API</span><div class="stat-track"><div class="stat-fill" style="--w:94%"></div></div></div>
+  </div>
+  <div class="hud-tag" id="hud-tr">UPTIME: 99.97%<br>LATENCY: 12ms</div>
+  <div id="title-block">
+    <div id="main-title">BACKEND DEVELOPMENT</div>
+    <div id="sub-title">Arquitectura &nbsp;·&nbsp; APIs &nbsp;·&nbsp; Bases de Datos</div>
+  </div>
+  <div id="hint">[ ARRASTRA LA IMAGEN PARA GIRARLA ]</div>
+</div>
+
+<button id="close-btn">✕</button>
+<div id="drag-hint">⟳ ARRASTRA PARA ROTAR &nbsp;&nbsp;|&nbsp;&nbsp; CLIC PARA EXPANDIR</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════
+//  RUTA DE LA IMAGEN — cambia solo esta línea
+// ════════════════════════════════════════════════════
+const IMAGE_PATH = 'imagenes/servidor.jpg';
+
+// ════════════════════════════════════════════════════
+//  ESCENA THREE.JS
+// ════════════════════════════════════════════════════
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000510, 0.042);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 0, 7);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000510);
+container.appendChild(renderer.domElement);
+
+// ── LUCES ─────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x0a1a2a, 2.5));
+
+const pl1 = new THREE.PointLight(0x00f5ff, 3.5, 18);
+pl1.position.set(4, 3, 5);
+scene.add(pl1);
+
+const pl2 = new THREE.PointLight(0x004466, 2.0, 14);
+pl2.position.set(-4, -3, 3);
+scene.add(pl2);
+
+// ── REJILLA DE FONDO ──────────────────────────────────
+(function() {
+  const mat = new THREE.LineBasicMaterial({ color: 0x002233, transparent: true, opacity: 0.32 });
+  const geo = new THREE.BufferGeometry();
+  const v = []; const S = 60, st = 2.5;
+  for (let i = -S; i <= S; i += st) { v.push(-S,0,i,S,0,i); v.push(i,0,-S,i,0,S); }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  const g = new THREE.LineSegments(geo, mat);
+  g.rotation.x = Math.PI / 2; g.position.z = -10;
+  scene.add(g);
+})();
+
+// ── PLANO CENTRAL ─────────────────────────────────────
+const planeMat = new THREE.MeshStandardMaterial({
+  color: 0x112233,           // color de espera mientras carga
+  emissive: new THREE.Color(0x001122),
+  emissiveIntensity: 0.35,
+  roughness: 0.25,
+  metalness: 0.6,
+  side: THREE.DoubleSide,
+});
+
+// Cargar imagen directamente
+new THREE.TextureLoader().load(
+  IMAGE_PATH,
+  function(tex) {                          // onLoad
+    planeMat.map          = tex;
+    planeMat.emissiveMap  = tex;
+    planeMat.color.set(0xffffff);
+    planeMat.needsUpdate  = true;
+  },
+  undefined,
+  function() {                             // onError — imagen no encontrada
+    console.warn('No se pudo cargar la imagen:', IMAGE_PATH);
+  }
+);
+
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 3.6), planeMat);
+const imageGroup = new THREE.Group();
+imageGroup.add(plane);
+scene.add(imageGroup);
+
+// Marco luminoso
+(function() {
+  const w=4.95, h=3.75, d=0.02;
+  const mat = new THREE.MeshStandardMaterial({ color:0x00f5ff, emissive:0x00f5ff, emissiveIntensity:1.2, roughness:0, metalness:1 });
+  [[w,d,d,0,h/2,0],[w,d,d,0,-h/2,0],[d,h,d,w/2,0,0],[d,h,d,-w/2,0,0]].forEach(([bw,bh,bd,px,py,pz]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat);
+    m.position.set(px,py,pz); imageGroup.add(m);
+  });
+})();
+
+// ── PARTÍCULAS ────────────────────────────────────────
+const PC = 1600;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(PC*3), pVel = new Float32Array(PC*3);
+for (let i = 0; i < PC; i++) {
+  const r=4+Math.random()*10, th=Math.random()*Math.PI*2, ph=(Math.random()-0.5)*Math.PI;
+  pPos[i*3]  = r*Math.cos(ph)*Math.cos(th);
+  pPos[i*3+1]= r*Math.sin(ph);
+  pPos[i*3+2]= r*Math.cos(ph)*Math.sin(th)-2;
+  pVel[i*3]  = (Math.random()-0.5)*0.003;
+  pVel[i*3+1]= (Math.random()-0.5)*0.003;
+  pVel[i*3+2]= (Math.random()-0.5)*0.002;
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ color:0x00c8ff, size:0.045, transparent:true, opacity:0.65, blending:THREE.AdditiveBlending, depthWrite:false });
+scene.add(new THREE.Points(pGeo, pMat));
+
+const SC=300, sGeo=new THREE.BufferGeometry(), sPos=new Float32Array(SC*3);
+for (let i=0;i<SC;i++) { sPos[i*3]=(Math.random()-0.5)*22; sPos[i*3+1]=(Math.random()-0.5)*14; sPos[i*3+2]=(Math.random()-0.5)*8-2; }
+sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+const sMat = new THREE.PointsMaterial({ color:0xffffff, size:0.02, transparent:true, opacity:0.4, blending:THREE.AdditiveBlending, depthWrite:false });
+scene.add(new THREE.Points(sGeo, sMat));
+
+// ── ANILLOS ───────────────────────────────────────────
+const rings = [3.4, 4.5, 5.8].map((r, i) => {
+  const m = new THREE.Mesh(
+    new THREE.TorusGeometry(r, 0.012, 6, 80),
+    new THREE.MeshBasicMaterial({ color:0x00f5ff, transparent:true, opacity:0.18, blending:THREE.AdditiveBlending })
+  );
+  m.rotation.x = 0.4+i*0.3; m.rotation.z = i*0.5;
+  scene.add(m); return m;
+});
+
+// ════════════════════════════════════════════════════
+//  ARRASTRE PARA ROTAR
+// ════════════════════════════════════════════════════
+const ROT_LIMIT_X = Math.PI / 2.1;
+const drag = { active:false, lastX:0, lastY:0, velX:0, velY:0, rotX:0, rotY:0, sensitivity:0.007 };
+const raycaster = new THREE.Raycaster();
+const tmpV2 = new THREE.Vector2();
+
+function toNDC(cx, cy) { tmpV2.set((cx/innerWidth)*2-1, -(cy/innerHeight)*2+1); return tmpV2; }
+function hitsPlane(cx, cy) {
+  raycaster.setFromCamera(toNDC(cx, cy), camera);
+  return raycaster.intersectObject(plane).length > 0;
+}
+
+function dragStart(cx, cy) {
+  if (st.expanded || st.animating) return;
+  if (!hitsPlane(cx, cy)) return;
+  drag.active = true; drag.lastX = cx; drag.lastY = cy;
+  drag.velX = 0; drag.velY = 0;
+  st.autoRotating = false;
+  renderer.domElement.style.cursor = 'grabbing';
+}
+function dragMove(cx, cy) {
+  if (!drag.active) return;
+  drag.velY = (cx - drag.lastX) * drag.sensitivity;
+  drag.velX = (cy - drag.lastY) * drag.sensitivity;
+  drag.rotX = Math.max(-ROT_LIMIT_X, Math.min(ROT_LIMIT_X, drag.rotX + drag.velX));
+  drag.rotY += drag.velY;
+  drag.lastX = cx; drag.lastY = cy;
+}
+function dragEnd() {
+  if (!drag.active) return;
+  drag.active = false;
+  renderer.domElement.style.cursor = 'grab';
+}
+
+// Mouse
+let pointerMoved = false;
+renderer.domElement.addEventListener('mousedown', e => { pointerMoved = false; dragStart(e.clientX, e.clientY); });
+renderer.domElement.addEventListener('mousemove', e => {
+  pointerMoved = true;
+  dragMove(e.clientX, e.clientY);
+  if (!drag.active && !st.expanded)
+    renderer.domElement.style.cursor = hitsPlane(e.clientX, e.clientY) ? 'grab' : 'crosshair';
+});
+renderer.domElement.addEventListener('mouseup', dragEnd);
+renderer.domElement.addEventListener('mouseleave', dragEnd);
+renderer.domElement.addEventListener('click', e => {
+  if (pointerMoved || st.animating || drag.active) return;
+  if (hitsPlane(e.clientX, e.clientY) && !st.expanded) expandImage();
+});
+
+// Touch
+renderer.domElement.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) return;
+  e.preventDefault(); pointerMoved = false;
+  dragStart(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+renderer.domElement.addEventListener('touchmove', e => {
+  if (e.touches.length !== 1) return;
+  e.preventDefault(); pointerMoved = true;
+  dragMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+renderer.domElement.addEventListener('touchend', e => {
+  dragEnd();
+  if (!pointerMoved && !st.expanded && !st.animating) {
+    const t = e.changedTouches[0];
+    if (hitsPlane(t.clientX, t.clientY)) expandImage();
+  }
+});
+
+// ════════════════════════════════════════════════════
+//  ESTADO EXPANDIR / COLAPSAR
+// ════════════════════════════════════════════════════
+const st = {
+  expanded: false, animating: false, autoRotating: true, lerpT: 0,
+  normalPos:    new THREE.Vector3(0, 0.2, 0),
+  normalScale:  new THREE.Vector3(1, 1, 1),
+  expandedPos:  new THREE.Vector3(0, 0, 3.5),
+  expandedScale:new THREE.Vector3(1.55, 1.55, 1.55),
+};
+imageGroup.position.copy(st.normalPos);
+
+const closeBtn = document.getElementById('close-btn');
+const dragHint = document.getElementById('drag-hint');
+
+function expandImage() {
+  st.expanded = true; st.animating = true; st.lerpT = 0;
+  st.autoRotating = false; drag.active = false;
+  closeBtn.style.display = 'flex';
+  dragHint.style.opacity = '0';
+  renderer.domElement.style.cursor = 'default';
+}
+function collapseImage() {
+  st.expanded = false; st.animating = true; st.lerpT = 0;
+  st.autoRotating = true;
+  closeBtn.style.display = 'none';
+  dragHint.style.opacity = '1';
+  renderer.domElement.style.cursor = 'crosshair';
+}
+closeBtn.addEventListener('click', collapseImage);
+setTimeout(() => { dragHint.style.opacity = '1'; }, 3500);
+
+// ════════════════════════════════════════════════════
+//  LOOP DE ANIMACIÓN
+// ════════════════════════════════════════════════════
+const lerp = (a, b, t) => a + (b - a) * t;
+let clock = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  clock += 0.014;
+
+  // Partículas
+  const pp = pGeo.attributes.position.array;
+  for (let i=0; i<PC; i++) {
+    pp[i*3]+=pVel[i*3]; pp[i*3+1]+=pVel[i*3+1]; pp[i*3+2]+=pVel[i*3+2];
+    if (pp[i*3]**2 + pp[i*3+1]**2 > 180) { pp[i*3]*=-0.85; pp[i*3+1]*=-0.85; }
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  sMat.opacity = 0.25 + 0.2 * Math.sin(clock * 2.3);
+
+  // Anillos
+  rings.forEach((r,i) => { r.rotation.y += 0.003*(i%2===0?1:-1); r.rotation.x += 0.001*(i+1); });
+
+  // Luz pulsante
+  pl1.intensity = 3.5 + Math.sin(clock * 1.7) * 0.5;
+  pl1.position.x = 4 * Math.cos(clock * 0.3);
+  pl1.position.z = 3 + 2 * Math.sin(clock * 0.25);
+
+  // Transición expandir/colapsar
+  if (st.animating) {
+    st.lerpT = Math.min(st.lerpT + 0.028, 1);
+    const ease = 1 - Math.pow(1 - st.lerpT, 3);
+    imageGroup.position.lerp(st.expanded ? st.expandedPos : st.normalPos, ease * 0.1);
+    imageGroup.scale.lerp(st.expanded ? st.expandedScale : st.normalScale, ease * 0.1);
+    if (st.lerpT >= 1) st.animating = false;
+  }
+
+  // Rotación
+  if (!st.expanded) {
+    if (drag.active) {
+      imageGroup.rotation.x = drag.rotX;
+      imageGroup.rotation.y = drag.rotY;
+    } else {
+      drag.velX *= 0.92; drag.velY *= 0.92;
+      drag.rotX = Math.max(-ROT_LIMIT_X, Math.min(ROT_LIMIT_X, drag.rotX + drag.velX));
+      drag.rotY += drag.velY;
+      if (st.autoRotating && Math.abs(drag.velX) + Math.abs(drag.velY) < 0.0005) {
+        drag.rotX = lerp(drag.rotX, Math.sin(clock*0.16)*0.07, 0.012);
+        drag.rotY = lerp(drag.rotY, Math.sin(clock*0.22)*0.18, 0.012);
+      }
+      imageGroup.rotation.x = drag.rotX;
+      imageGroup.rotation.y = drag.rotY;
+    }
+  } else {
+    imageGroup.rotation.x = lerp(imageGroup.rotation.x, 0, 0.07);
+    imageGroup.rotation.y = lerp(imageGroup.rotation.y, 0, 0.07);
+    drag.rotX = imageGroup.rotation.x;
+    drag.rotY = imageGroup.rotation.y;
+  }
+
+  planeMat.emissiveIntensity = 0.28 + Math.sin(clock * 1.2) * 0.08;
+  camera.position.y = 0.1 * Math.sin(clock * 0.4);
+  camera.lookAt(0, 0, 0);
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

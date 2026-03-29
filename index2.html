@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Serie de Fibonacci</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 10px;
+            width: 100%;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #218838;
+        }
+
+        #resultado {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 500px) {
+            .container {
+                margin: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Serie de Fibonacci</h2>
+
+    <input type="number" id="numero" placeholder="Ingresa un número" min="1">
+    <button onclick="calcular()">Calcular</button>
+
+    <p id="resultado"></p>
+</div>
+
+<script>
+    function calcular() {
+        const n = parseInt(document.getElementById("numero").value);
+        const resultado = document.getElementById("resultado");
+
+        if (isNaN(n) || n <= 0) {
+            resultado.textContent = "Ingresa un número válido";
+            return;
+        }
+
+        let fib = [0, 1];
+
+        for (let i = 2; i < n; i++) {
+            fib[i] = fib[i - 1] + fib[i - 2];
+        }
+
+        resultado.textContent = "Serie: " + fib.slice(0, n).join(", ");
+    }
+</script>
+
+</body>
+</html>
