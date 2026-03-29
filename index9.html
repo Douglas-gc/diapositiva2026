@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧾 Conclusión — Backend</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&family=Exo+2:wght@200;300;400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cyan:   #00e5ff;
+    --blue:   #0288d1;
+    --violet: #7c3aed;
+    --dark:   #020b18;
+    --mid:    #061628;
+    --glow:   0 0 18px #00e5ffaa, 0 0 40px #00e5ff44;
+    --glow-v: 0 0 18px #7c3aedaa, 0 0 40px #7c3aed44;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--dark);
+    cursor: none;
+    font-family: 'Exo 2', sans-serif;
+  }
+
+  /* ── Three.js canvas ── */
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* ── Overlay vignette ── */
+  .vignette {
+    position: fixed; inset: 0; z-index: 1;
+    background: radial-gradient(ellipse at center,
+      transparent 40%, rgba(2,11,24,.85) 100%);
+    pointer-events: none;
+  }
+
+  /* ── Emoji canvas overlay ── */
+  #emoji-canvas {
+    position: fixed; inset: 0; z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ── Main content ── */
+  .slide {
+    position: fixed; inset: 0; z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px 80px;
+    pointer-events: none;
+  }
+
+  .container {
+    max-width: 780px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+
+  /* ── Title ── */
+  .title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 6vw, 3.6rem);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    text-shadow: var(--glow);
+    opacity: 0;
+    transform: translateY(-24px);
+    animation: fadeDown .8s .1s cubic-bezier(.22,1,.36,1) forwards;
+    position: relative;
+  }
+  .title-icon {
+    text-decoration: none;
+    cursor: none;
+    pointer-events: all;
+    display: inline-block;
+    transition: transform .25s cubic-bezier(.22,1,.36,1), filter .25s;
+    filter: drop-shadow(0 0 6px rgba(0,229,255,.4));
+  }
+  .title-icon:hover {
+    transform: scale(1.25) rotate(-8deg);
+    filter: drop-shadow(0 0 16px rgba(0,229,255,.9));
+  }
+
+  .title::after {
+    content: '';
+    display: block;
+    margin: 10px auto 0;
+    width: 60%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    box-shadow: var(--glow);
+  }
+
+  /* ── Text card ── */
+  .card {
+    background: rgba(6,22,40,.55);
+    border: 1px solid rgba(0,229,255,.15);
+    border-radius: 16px;
+    padding: 36px 40px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg,
+      rgba(0,229,255,.04) 0%, transparent 60%,
+      rgba(124,58,237,.06) 100%);
+    pointer-events: none;
+  }
+  /* corner accents */
+  .card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 60px; height: 60px;
+    border-top: 2px solid var(--cyan);
+    border-left: 2px solid var(--cyan);
+    border-radius: 16px 0 0 0;
+    opacity: .5;
+  }
+  .corner-br {
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 60px; height: 60px;
+    border-bottom: 2px solid var(--violet);
+    border-right: 2px solid var(--violet);
+    border-radius: 0 0 16px 0;
+    opacity: .5;
+  }
+
+  /* ── Paragraph lines (animated) ── */
+  .body-text {
+    font-family: 'Exo 2', sans-serif;
+    font-size: clamp(.9rem, 2.1vw, 1.08rem);
+    font-weight: 300;
+    line-height: 1.85;
+    color: rgba(200,230,255,.88);
+    text-align: justify;
+    position: relative;
+    z-index: 1;
+  }
+
+  .line {
+    display: block;
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  /* Staggered fade-in for each sentence block */
+  .line:nth-child(1) { animation: fadeUp .7s .6s  forwards; }
+  .line:nth-child(2) { animation: fadeUp .7s .95s forwards; }
+  .line:nth-child(3) { animation: fadeUp .7s 1.3s forwards; }
+
+  /* subtle glow on key words */
+  .kw {
+    color: var(--cyan);
+    text-shadow: 0 0 10px rgba(0,229,255,.5);
+    font-weight: 400;
+  }
+  .kw2 {
+    color: #a78bfa;
+    text-shadow: 0 0 10px rgba(167,139,250,.5);
+    font-weight: 400;
+  }
+
+  /* ── Badge row ── */
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeUp .6s 1.8s forwards;
+  }
+  .badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .78rem;
+    padding: 6px 16px;
+    border-radius: 30px;
+    border: 1px solid rgba(0,229,255,.3);
+    color: var(--cyan);
+    background: rgba(0,229,255,.06);
+    letter-spacing: .08em;
+    text-shadow: 0 0 8px rgba(0,229,255,.4);
+    transition: all .3s;
+  }
+
+  /* ── Keyframes ── */
+  @keyframes fadeDown {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Navigation arrows ── */
+  .nav-arrow {
+    position: fixed;
+    bottom: 28px;
+    z-index: 10;
+    pointer-events: all;
+    text-decoration: none;
+    font-size: 1.5rem;
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0,229,255,.35);
+    color: var(--cyan);
+    background: rgba(0,229,255,.06);
+    backdrop-filter: blur(6px);
+    transition: all .3s cubic-bezier(.22,1,.36,1);
+    text-shadow: var(--glow);
+    box-shadow: 0 0 12px rgba(0,229,255,.1);
+    cursor: none;
+  }
+  .nav-arrow:hover {
+    border-color: var(--cyan);
+    background: rgba(0,229,255,.15);
+    box-shadow: var(--glow), 0 0 30px rgba(0,229,255,.2);
+    transform: scale(1.12);
+  }
+  .nav-arrow.left  { left:  28px; }
+  .nav-arrow.right { right: 28px; }
+
+  /* ── Custom cursor dot ── */
+  #cursor {
+    position: fixed;
+    top: 0; left: 0;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: var(--glow);
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform .1s;
+    mix-blend-mode: screen;
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 600px) {
+    .card { padding: 24px 20px; }
+    .slide { padding: 50px 16px 72px; }
+    .nav-arrow { width: 44px; height: 44px; font-size: 1.2rem; bottom: 18px; }
+    .nav-arrow.left  { left:  16px; }
+    .nav-arrow.right { right: 16px; }
+  }
+
+  /* show cursor only on desktop */
+  @media (hover: none) {
+    #cursor { display: none; }
+    body { cursor: default; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="vignette"></div>
+<canvas id="emoji-canvas"></canvas>
+
+<div id="cursor"></div>
+
+<div class="slide">
+  <div class="container">
+
+    <h1 class="title"><a href="index11.html" class="title-icon" title="Ir a index11">🧾</a> Conclusión</h1>
+
+    <div class="card">
+      <div class="corner-br"></div>
+      <p class="body-text">
+        <span class="line">
+          El <span class="kw">backend</span> constituye el <span class="kw">núcleo funcional</span> de una aplicación,
+          ya que se encarga de procesar la información, aplicar la
+          <span class="kw2">lógica de negocio</span> y garantizar la comunicación eficiente
+          con las <span class="kw">bases de datos</span> y servicios externos.
+        </span>
+        <span class="line">
+          Su correcta implementación permite desarrollar sistemas
+          <span class="kw">seguros</span>, <span class="kw">escalables</span> y <span class="kw">eficientes</span>,
+          asegurando que las operaciones del usuario se ejecuten de manera
+          <span class="kw2">confiable</span>.
+        </span>
+        <span class="line">
+          En conjunto con el <span class="kw2">frontend</span>, el backend hace posible
+          el funcionamiento integral de cualquier
+          <span class="kw">sistema informático moderno</span>.
+        </span>
+      </p>
+    </div>
+
+
+  </div>
+</div>
+
+<a class="nav-arrow left" href="index8.html" title="Anterior">←</a>
+<a class="nav-arrow right" href="index10.html" title="Siguiente">→</a>
+
+<!-- Three.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════
+   THREE.JS BACKGROUND — particle field
+═══════════════════════════════════════════ */
+(function () {
+  const canvas = document.getElementById('bg-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
+  camera.position.z = 80;
+
+  /* Ambient + point lights */
+  scene.add(new THREE.AmbientLight(0x0a1a2e, 2));
+  const ptLight = new THREE.PointLight(0x00e5ff, 2, 200);
+  ptLight.position.set(0, 40, 60);
+  scene.add(ptLight);
+  const ptLight2 = new THREE.PointLight(0x7c3aed, 1.5, 200);
+  ptLight2.position.set(-60, -30, 40);
+  scene.add(ptLight2);
+
+  /* Particle field */
+  const N = 1400;
+  const positions = new Float32Array(N * 3);
+  const colors    = new Float32Array(N * 3);
+  const sizes     = new Float32Array(N);
+  const cyan   = new THREE.Color(0x00e5ff);
+  const violet = new THREE.Color(0x7c3aed);
+  const white  = new THREE.Color(0xffffff);
+
+  for (let i = 0; i < N; i++) {
+    positions[i*3]   = (Math.random() - .5) * 260;
+    positions[i*3+1] = (Math.random() - .5) * 160;
+    positions[i*3+2] = (Math.random() - .5) * 120;
+    const t = Math.random();
+    const c = t < .5 ? cyan.clone().lerp(white, t*2)
+                     : violet.clone().lerp(cyan, (t-.5)*2);
+    colors[i*3]   = c.r;
+    colors[i*3+1] = c.g;
+    colors[i*3+2] = c.b;
+    sizes[i] = Math.random() * 1.8 + .4;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('size',     new THREE.BufferAttribute(sizes, 1));
+
+  const mat = new THREE.PointsMaterial({
+    size: 1.2,
+    vertexColors: true,
+    transparent: true,
+    opacity: .7,
+    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  /* Floating lines (data streams) */
+  const lineMat = new THREE.LineBasicMaterial({
+    color: 0x00e5ff, transparent: true, opacity: .08,
+    blending: THREE.AdditiveBlending,
+  });
+  for (let l = 0; l < 18; l++) {
+    const pts = [];
+    const x = (Math.random() - .5) * 260;
+    const z = (Math.random() - .5) * 120;
+    for (let s = 0; s < 8; s++) {
+      pts.push(new THREE.Vector3(x + (Math.random()-.5)*10,
+                                 (Math.random()-.5)*160,
+                                 z + (Math.random()-.5)*10));
+    }
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    scene.add(new THREE.Line(lineGeo, lineMat));
+  }
+
+  /* Resize */
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  /* Animate */
+  let t = 0;
+  (function loop() {
+    requestAnimationFrame(loop);
+    t += .0005;
+    points.rotation.y = t * .3;
+    points.rotation.x = t * .12;
+    ptLight.position.x  = Math.sin(t * 1.1) * 60;
+    ptLight.position.y  = Math.cos(t * .8)  * 40;
+    ptLight2.position.x = Math.cos(t * .9) * 50;
+    ptLight2.position.y = Math.sin(t * .7) * 35;
+    renderer.render(scene, camera);
+  })();
+})();
+
+/* ═══════════════════════════════════════════
+   EMOJI CURSOR TRAIL
+═══════════════════════════════════════════ */
+(function () {
+  const canvas = document.getElementById('emoji-canvas');
+  const ctx    = canvas.getContext('2d');
+  const EMOJIS = ['💻','⚙️','🔐','🌐','🧠','🔥','📡','🛡️','⚡','🗄️'];
+  const MAX    = 40;
+  let particles = [];
+  let mouse = { x: -999, y: -999 };
+
+  function resize() {
+    canvas.width  = innerWidth;
+    canvas.height = innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function spawnAt(x, y) {
+    if (particles.length >= MAX) return;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 1.4 + .3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed * .8 + (Math.random()-.5) * .6,
+      vy: Math.sin(angle) * speed * .8 + (Math.random()-.5) * .6 - .5,
+      emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+      scale: Math.random() * .6 + .7,
+      rotation: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - .5) * .08,
+      alpha: 1,
+      life: 0,
+      maxLife: Math.random() * 55 + 35,
+      size: Math.random() * 14 + 18,
+    });
+  }
+
+  let lastX = 0, lastY = 0, spawnThrottle = 0;
+
+  function onMove(x, y) {
+    mouse.x = x; mouse.y = y;
+    const dx = x - lastX, dy = y - lastY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > 12 && spawnThrottle <= 0) {
+      spawnAt(x, y);
+      lastX = x; lastY = y;
+      spawnThrottle = 3;
+    }
+  }
+
+  document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+  document.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    onMove(t.clientX, t.clientY);
+  }, { passive: false });
+
+  /* Custom cursor dot */
+  const dot = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    dot.style.left = e.clientX + 'px';
+    dot.style.top  = e.clientY + 'px';
+  });
+
+  function draw() {
+    requestAnimationFrame(draw);
+    spawnThrottle--;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += .018;          // gentle gravity
+      p.vx *= .985;
+      p.rotation += p.rotSpeed;
+      p.life++;
+      p.alpha = 1 - (p.life / p.maxLife);
+      const scaleAnim = p.scale * (1 - p.life / p.maxLife * .4);
+
+      if (p.life >= p.maxLife) { particles.splice(i, 1); continue; }
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.scale(scaleAnim, scaleAnim);
+      ctx.font = `${p.size}px serif`;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+
+      /* soft glow */
+      ctx.shadowColor  = 'rgba(0,229,255,0.6)';
+      ctx.shadowBlur   = 10;
+
+      ctx.fillText(p.emoji, 0, 0);
+      ctx.restore();
+    }
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

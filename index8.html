@@ -95,8 +95,8 @@
     #canvas-wrap {
       position: relative;
       /* 676×603 → ratio ≈ 1.121 */
-      width:  min(62vh, 82vw);
-      height: min(55.3vh, 73.1vw); /* width / 1.121 */
+      width:  min(vh, 95vw);
+      height: min(71.3vh, 85.1vw); /* width / 1.121 */
       opacity: 0;
       animation: fadeUp 0.9s ease 0.5s forwards;
     }
@@ -511,8 +511,8 @@
     }
 
     // Size canvas: keep ratio, fit within viewport with generous padding
-    const maxW = innerWidth  * 0.84;
-    const maxH = innerHeight * 0.84;
+    const maxW = innerWidth  * 1.25;
+    const maxH = innerHeight * 1.25;
     const ratio2 = 676/603;
     let cw = maxW, ch = maxW / ratio2;
     if (ch > maxH) { ch = maxH; cw = maxH * ratio2; }
