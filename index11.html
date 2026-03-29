@@ -30,6 +30,17 @@
     overflow: hidden;
   }
 
+  /* En móvil permitir scroll */
+  @media (max-width: 768px) {
+    html, body { overflow: auto; }
+    .scroll-layer {
+      position: relative;
+      inset: auto;
+      min-height: 100vh;
+    }
+    #bg-canvas, #trail-canvas, .vignette { position: fixed; }
+  }
+
   #bg-canvas {
     position: fixed; inset: 0; z-index: 0;
   }
@@ -481,7 +492,7 @@
     <!-- Q4 -->
     <div class="question-block" data-q="3">
       <div class="q-label">PREGUNTA 04 · VERDADERO / FALSO</div>
-      <div class="q-text">El usuario interactúa directamente con el backend.</div>
+      <div class="q-text">El usuario interactua directamente con el backend.</div>
       <div class="options">
         <label class="option">
           <input type="radio" name="q3" value="0">
@@ -662,9 +673,8 @@
 
   document.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
   document.addEventListener('touchmove', e => {
-    e.preventDefault();
     onMove(e.touches[0].clientX, e.touches[0].clientY);
-  }, { passive: false });
+  }, { passive: true });
 
   const dot = document.getElementById('cursor');
   document.addEventListener('mousemove', e => {
