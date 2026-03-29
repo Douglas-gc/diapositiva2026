@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Funciones del Backend — Slide 3</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:   #00f5ff;
+      --purple: #7b2fff;
+      --green:  #00ff9d;
+      --glow:   rgba(0,245,255,0.18);
+      --bg:     #03060f;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Exo 2', sans-serif;
+      color: #fff;
+    }
+
+    /* ── Particle background ── */
+    #bg-canvas {
+      position: fixed; inset: 0; z-index: 0;
+    }
+
+    /* ── Scanlines ── */
+    .scanlines {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom, transparent, transparent 3px,
+        rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px
+      );
+    }
+
+    /* ── Corner decorations ── */
+    .corner {
+      position: fixed; width: 24px; height: 24px;
+      z-index: 10; pointer-events: none;
+    }
+    .corner.tl { top:16px; left:16px; border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.tr { top:16px; right:16px; border-top:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+    .corner.bl { bottom:16px; left:16px; border-bottom:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+    .corner.br { bottom:16px; right:16px; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+
+    /* ── Main layout ── */
+    #slide {
+      position: relative; z-index: 1;
+      width: 100%; height: 100vh;
+      display: flex; align-items: stretch;
+    }
+
+    /* ══════════════════════════
+       LEFT — Text panel
+    ══════════════════════════ */
+    #text-panel {
+      width: 50%;
+      padding: 4vh 3vw 4vh 6vw;
+      display: flex; flex-direction: column;
+      justify-content: center; gap: 1.6rem;
+      overflow: hidden;
+    }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,245,255,0.07);
+      border: 1px solid rgba(0,245,255,0.3);
+      border-radius: 999px; padding: 5px 16px;
+      font-size: 0.7rem; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--cyan);
+      width: fit-content;
+      opacity: 0; animation: fadeUp 0.7s ease 0.2s forwards;
+    }
+    .chip-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.2rem, 2.4vw, 2rem);
+      font-weight: 900; line-height: 1.15;
+      opacity: 0; animation: fadeUp 0.7s ease 0.4s forwards;
+    }
+    h1 span.accent { color: var(--cyan); }
+
+    .divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      border-radius: 2px;
+      opacity: 0; animation: fadeUp 0.7s ease 0.5s forwards;
+    }
+
+    /* ── Function list ── */
+    .fn-list {
+      list-style: none;
+      display: flex; flex-direction: column; gap: 0.65rem;
+    }
+
+    .fn-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,245,255,0.0);
+      background: rgba(255,255,255,0.02);
+      opacity: 0;
+      transform: translateX(-30px);
+      transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+    }
+    .fn-item.visible {
+      animation: slideGlow 0.55s cubic-bezier(.23,1,.32,1) forwards;
+    }
+    .fn-item:hover {
+      border-color: rgba(0,245,255,0.25);
+      background: rgba(0,245,255,0.05);
+      box-shadow: 0 0 18px rgba(0,245,255,0.08);
+    }
+
+    .fn-icon {
+      flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: 6px;
+      background: rgba(0,245,255,0.1);
+      border: 1px solid rgba(0,245,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem;
+    }
+
+    .fn-text {
+      font-size: clamp(0.75rem, 1.2vw, 0.92rem);
+      font-weight: 400; line-height: 1.4;
+      color: rgba(255,255,255,0.85);
+    }
+    .fn-text strong { color: var(--cyan); font-weight: 600; }
+
+    /* ══════════════════════════
+       RIGHT — Three.js panel
+    ══════════════════════════ */
+    #canvas-panel {
+      width: 50%; height: 100vh; position: relative;
+    }
+    #three-canvas {
+      width: 100%; height: 100%; display: block;
+    }
+
+    /* ── Hint label ── */
+    .canvas-hint {
+      position: absolute; bottom: 80px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem; letter-spacing: 0.14em;
+      color: rgba(0,245,255,0.35);
+      text-transform: uppercase; pointer-events: none;
+      animation: fadeUp 1s ease 2.5s both;
+    }
+
+    /* ── Navigation ── */
+    .nav-arrow {
+      position: fixed; bottom: 32px; z-index: 50;
+      text-decoration: none;
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.5);
+      padding: 10px 20px;
+      border: 1px solid rgba(0,245,255,0.2);
+      border-radius: 999px;
+      background: rgba(3,6,15,0.6);
+      backdrop-filter: blur(8px);
+      transition: color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+    }
+    .nav-arrow:hover {
+      color: var(--cyan); border-color: var(--cyan);
+      box-shadow: 0 0 20px var(--glow);
+      transform: translateY(-2px);
+    }
+    .nav-arrow .arrow { font-size: 1.2rem; }
+    #nav-prev { left: 32px; }
+    #nav-next { right: 32px; }
+
+    .slide-num {
+      position: fixed; bottom: 36px; left: 50%;
+      transform: translateX(-50%); z-index: 50;
+      font-family: 'Orbitron', sans-serif; font-size: 0.7rem;
+      letter-spacing: 0.2em; color: rgba(255,255,255,0.25);
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideGlow {
+      0%   { opacity: 0; transform: translateX(-30px); box-shadow: none; }
+      60%  { box-shadow: 0 0 22px rgba(0,245,255,0.22); }
+      100% { opacity: 1; transform: translateX(0); box-shadow: none; }
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; } 50% { opacity:0.35; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      html, body { overflow-y: auto; }
+      #slide { flex-direction: column; height: auto; min-height: 100vh; }
+      #text-panel { width: 100%; padding: 5vh 5vw 3vh; }
+      #canvas-panel { width: 100%; height: 52vw; min-height: 260px; }
+      h1 { font-size: clamp(1rem, 4vw, 1.4rem); }
+      .fn-text { font-size: 0.8rem; }
+      .canvas-hint { display: none; }
+      .slide-num { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="bg-canvas"></canvas>
+  <div class="scanlines"></div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+
+  <div id="slide">
+
+    <!-- LEFT -->
+    <div id="text-panel">
+      <div class="chip"><span class="chip-dot"></span>Slide 03 — Funciones</div>
+
+      <h1>Funciones principales<br/>del <span class="accent">Backend</span></h1>
+      <div class="divider"></div>
+
+      <ul class="fn-list" id="fn-list">
+        <li class="fn-item">
+          <span class="fn-icon">⚡</span>
+          <span class="fn-text"><strong>Procesar solicitudes</strong> del usuario (peticiones HTTP).</span>
+        </li>
+        <li class="fn-item">
+          <span class="fn-icon">⚙️</span>
+          <span class="fn-text"><strong>Aplicar lógica</strong> de negocio.</span>
+        </li>
+        <li class="fn-item">
+          <span class="fn-icon">🗄️</span>
+          <span class="fn-text"><strong>Gestionar bases</strong> de datos.</span>
+        </li>
+        <li class="fn-item">
+          <span class="fn-icon">🔐</span>
+          <span class="fn-text"><strong>Autenticación y autorización</strong> de usuarios.</span>
+        </li>
+        <li class="fn-item">
+          <span class="fn-icon">🔗</span>
+          <span class="fn-text"><strong>Integración</strong> con servicios externos (APIs).</span>
+        </li>
+        <li class="fn-item">
+          <span class="fn-icon">🛡️</span>
+          <span class="fn-text"><strong>Seguridad</strong> de la aplicación.</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- RIGHT -->
+    <div id="canvas-panel">
+      <canvas id="three-canvas"></canvas>
+      <div class="canvas-hint">arrastra para rotar</div>
+    </div>
+
+  </div>
+
+  <a href="index2.html" class="nav-arrow" id="nav-prev"><span class="arrow">←</span> Anterior</a>
+  <a href="index4.html" class="nav-arrow" id="nav-next">Siguiente <span class="arrow">→</span></a>
+  <div class="slide-num">03 / 05</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+  /* ═══════════════════════════════════════
+     1. STAGGERED LIST ANIMATION
+  ═══════════════════════════════════════ */
+  const items = document.querySelectorAll('.fn-item');
+  items.forEach((el, i) => {
+    setTimeout(() => el.classList.add('visible'), 800 + i * 280);
+  });
+
+  /* ═══════════════════════════════════════
+     2. PARTICLE BACKGROUND
+  ═══════════════════════════════════════ */
+  (function () {
+    const cv = document.getElementById('bg-canvas');
+    const cx = cv.getContext('2d');
+    let W, H, pts = [];
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+    for (let i = 0; i < 160; i++) pts.push({
+      x: Math.random()*W, y: Math.random()*H,
+      vx:(Math.random()-.5)*.28, vy:-(Math.random()*.55+.18),
+      r:Math.random()*1.3+.3, a:Math.random()*.55+.18,
+      h:Math.random()<.6?188:265
+    });
+    (function loop(){
+      cx.clearRect(0,0,W,H);
+      pts.forEach(p=>{
+        p.x+=p.vx; p.y+=p.vy;
+        if(p.y<-8){p.x=Math.random()*W; p.y=H+8;}
+        cx.beginPath(); cx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        cx.fillStyle=`hsla(${p.h},100%,70%,${p.a})`; cx.fill();
+      });
+      requestAnimationFrame(loop);
+    })();
+  })();
+
+  /* ═══════════════════════════════════════
+     3. THREE.JS — NETWORK ANIMATION
+  ═══════════════════════════════════════ */
+  (function () {
+    const panel  = document.getElementById('canvas-panel');
+    const canvas = document.getElementById('three-canvas');
+
+    const scene    = new THREE.Scene();
+    const camera   = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    camera.position.set(0, 0, 7);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+    function resize() {
+      const w = panel.clientWidth, h = panel.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    /* ── Lights ── */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const pt1 = new THREE.PointLight(0x00f5ff, 2.5, 12);
+    pt1.position.set(3, 3, 4);
+    scene.add(pt1);
+    const pt2 = new THREE.PointLight(0x7b2fff, 1.8, 10);
+    pt2.position.set(-3, -2, 3);
+    scene.add(pt2);
+
+    /* ── Root group (rotates with drag) ── */
+    const root = new THREE.Group();
+    scene.add(root);
+
+    /* ══════════════════════════════════
+       NODES
+    ══════════════════════════════════ */
+    const NODE_COUNT = 14;
+    const SPREAD     = 3.2;
+    const nodes      = [];
+
+    const colors = [0x00f5ff, 0x7b2fff, 0x00ff9d, 0x0044ff, 0xff2fff];
+
+    for (let i = 0; i < NODE_COUNT; i++) {
+      const r     = i < 3 ? 0.18 : (i < 7 ? 0.12 : 0.08); // vary size
+      const color = colors[i % colors.length];
+      const geo   = new THREE.SphereGeometry(r, 16, 16);
+      const mat   = new THREE.MeshStandardMaterial({
+        color, emissive: color, emissiveIntensity: 0.6,
+        metalness: 0.3, roughness: 0.4
+      });
+      const mesh  = new THREE.Mesh(geo, mat);
+
+      // Random position
+      mesh.position.set(
+        (Math.random() - 0.5) * SPREAD * 2,
+        (Math.random() - 0.5) * SPREAD * 1.4,
+        (Math.random() - 0.5) * SPREAD
+      );
+
+      // Floating params
+      mesh.userData = {
+        orig:  mesh.position.clone(),
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.4 + Math.random() * 0.4,
+        amp:   0.12 + Math.random() * 0.14,
+        color, mat
+      };
+
+      root.add(mesh);
+      nodes.push(mesh);
+    }
+
+    /* ── Glow sprites behind large nodes ── */
+    function makeSprite(color, size) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const g = c.getContext('2d');
+      const grad = g.createRadialGradient(32,32,0,32,32,32);
+      const hex = '#' + color.toString(16).padStart(6,'0');
+      grad.addColorStop(0,   hex + 'cc');
+      grad.addColorStop(0.4, hex + '44');
+      grad.addColorStop(1,   'transparent');
+      g.fillStyle = grad;
+      g.fillRect(0,0,64,64);
+      const tex  = new THREE.CanvasTexture(c);
+      const mat  = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      const spr  = new THREE.Sprite(mat);
+      spr.scale.setScalar(size);
+      return spr;
+    }
+
+    nodes.slice(0, 5).forEach(n => {
+      const spr = makeSprite(n.userData.color, 0.9);
+      n.add(spr);
+    });
+
+    /* ══════════════════════════════════
+       EDGES (lines between close nodes)
+    ══════════════════════════════════ */
+    const MAX_DIST   = 2.8;
+    const edges      = []; // { line, i, j, pulses:[] }
+    const lineMat    = new THREE.LineBasicMaterial({
+      color: 0x00f5ff, transparent: true, opacity: 0.18,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+
+    for (let i = 0; i < NODE_COUNT; i++) {
+      for (let j = i + 1; j < NODE_COUNT; j++) {
+        const d = nodes[i].position.distanceTo(nodes[j].position);
+        if (d < MAX_DIST) {
+          const geo  = new THREE.BufferGeometry().setFromPoints([
+            nodes[i].position.clone(),
+            nodes[j].position.clone()
+          ]);
+          const line = new THREE.Line(geo, lineMat.clone());
+          root.add(line);
+          edges.push({ line, i, j, pulses: [], nextPulse: Math.random() * 4 });
+        }
+      }
+    }
+
+    /* ══════════════════════════════════
+       PULSE PARTICLES travelling on edges
+    ══════════════════════════════════ */
+    const pulseGeo = new THREE.SphereGeometry(0.045, 8, 8);
+    const pulseMat = new THREE.MeshBasicMaterial({
+      color: 0x00f5ff, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+
+    function spawnPulse(edge) {
+      const mesh = new THREE.Mesh(pulseGeo, pulseMat.clone());
+      root.add(mesh);
+      edge.pulses.push({ mesh, t: 0, speed: 0.008 + Math.random() * 0.006 });
+    }
+
+    /* ══════════════════════════════════
+       MOUSE / TOUCH DRAG → ROTATE
+    ══════════════════════════════════ */
+    let isDrag = false, lastX = 0, lastY = 0;
+    let velX = 0, velY = 0;
+    let mouseNX = 0, mouseNY = 0; // normalized -1..1 for parallax
+
+    function onDown(x, y) { isDrag = true; lastX = x; lastY = y; velX = 0; velY = 0; }
+    function onMove(x, y) {
+      // Parallax from full window
+      mouseNX = (x / innerWidth)  * 2 - 1;
+      mouseNY = (y / innerHeight) * 2 - 1;
+      if (!isDrag) return;
+      const dx = x - lastX, dy = y - lastY;
+      velX = dy * 0.006; velY = dx * 0.006;
+      root.rotation.x += velX;
+      root.rotation.y += velY;
+      lastX = x; lastY = y;
+    }
+    function onUp() { isDrag = false; }
+
+    canvas.addEventListener('mousedown',  e => onDown(e.clientX, e.clientY));
+    window.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup',    onUp);
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); onDown(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+    canvas.addEventListener('touchend',   onUp);
+    canvas.style.cursor = 'grab';
+    canvas.addEventListener('mousedown', () => canvas.style.cursor = 'grabbing');
+    window.addEventListener('mouseup',   () => canvas.style.cursor = 'grab');
+
+    /* ══════════════════════════════════
+       ANIMATION LOOP
+    ══════════════════════════════════ */
+    let t = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.012;
+
+      /* ── Floating nodes ── */
+      nodes.forEach(n => {
+        const u = n.userData;
+        n.position.x = u.orig.x + Math.sin(t * u.speed + u.phase) * u.amp;
+        n.position.y = u.orig.y + Math.cos(t * u.speed * 0.7 + u.phase) * u.amp * 0.8;
+        n.position.z = u.orig.z + Math.sin(t * u.speed * 0.5 + u.phase * 1.3) * u.amp * 0.5;
+        // Emissive pulse
+        u.mat.emissiveIntensity = 0.4 + Math.sin(t * u.speed * 2 + u.phase) * 0.3;
+      });
+
+      /* ── Update edge geometry (nodes moved) ── */
+      edges.forEach(e => {
+        const posArr = e.line.geometry.attributes.position;
+        const a = nodes[e.i].position, b = nodes[e.j].position;
+        posArr.setXYZ(0, a.x, a.y, a.z);
+        posArr.setXYZ(1, b.x, b.y, b.z);
+        posArr.needsUpdate = true;
+
+        /* ── Pulse spawner ── */
+        e.nextPulse -= 0.012;
+        if (e.nextPulse <= 0) {
+          spawnPulse(e);
+          e.nextPulse = 1.5 + Math.random() * 3;
+        }
+
+        /* ── Move pulses ── */
+        e.pulses = e.pulses.filter(p => {
+          p.t += p.speed;
+          if (p.t >= 1) {
+            root.remove(p.mesh);
+            return false;
+          }
+          const a = nodes[e.i].position, b = nodes[e.j].position;
+          p.mesh.position.lerpVectors(a, b, p.t);
+          p.mesh.material.opacity = Math.sin(p.t * Math.PI);
+          return true;
+        });
+
+        // Edge opacity based on node distance
+        const d = nodes[e.i].position.distanceTo(nodes[e.j].position);
+        e.line.material.opacity = Math.max(0, 0.25 - d * 0.04);
+      });
+
+      /* ── Auto-rotate (slow, overridden by drag inertia) ── */
+      if (!isDrag) {
+        root.rotation.y += (velY += (-root.rotation.y * 0.001 + 0.0015));
+        root.rotation.x += (velX *= 0.95);
+        velY *= 0.97;
+        // Parallax tilt toward cursor
+        root.rotation.y += (mouseNX * 0.12 - root.rotation.y) * 0.015;
+        root.rotation.x += (-mouseNY * 0.08 - root.rotation.x) * 0.015;
+      }
+
+      /* ── Orbiting lights ── */
+      pt1.position.x = Math.sin(t * 0.5) * 4;
+      pt1.position.y = Math.cos(t * 0.4) * 3;
+      pt2.position.x = Math.cos(t * 0.35) * 3.5;
+      pt2.position.y = Math.sin(t * 0.5) * 2.5;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  })();
+  </script>
+</body>
+</html>
