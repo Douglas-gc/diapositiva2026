@@ -1,91 +1,571 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Serie de Fibonacci</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Backend Development — Slide 2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #f0f2f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
+    :root {
+      --cyan:   #00f5ff;
+      --blue:   #0044ff;
+      --purple: #7b2fff;
+      --glow:   rgba(0,245,255,0.18);
+      --bg:     #03060f;
+    }
 
-        .container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            width: 100%;
-            max-width: 400px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Exo 2', sans-serif;
+      color: #fff;
+    }
 
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-        }
+    /* ── Three.js canvas ── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
 
-        button {
-            padding: 10px;
-            width: 100%;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+    /* ── Main layout ── */
+    #slide {
+      position: relative;
+      z-index: 1;
+      width: 100%; height: 100vh;
+      display: flex;
+      align-items: center;
+    }
 
-        button:hover {
-            background: #218838;
-        }
+    /* ── Left panel ── */
+    #text-panel {
+      width: 50%;
+      padding: 5vh 4vw 5vh 6vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2rem;
+      opacity: 0;
+      transform: translateX(-60px);
+      animation: slideInLeft 1.1s cubic-bezier(.23,1,.32,1) 0.4s forwards;
+    }
 
-        #resultado {
-            margin-top: 15px;
-            font-weight: bold;
-        }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,245,255,0.08);
+      border: 1px solid rgba(0,245,255,0.35);
+      border-radius: 999px;
+      padding: 5px 16px;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      width: fit-content;
+    }
+    .chip-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
 
-        @media (max-width: 500px) {
-            .container {
-                margin: 10px;
-            }
-        }
-    </style>
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.8rem, 3.5vw, 3rem);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+    h1 span.accent { color: var(--cyan); }
+
+    .divider {
+      width: 70px; height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      border-radius: 2px;
+    }
+
+    .definition {
+      font-size: clamp(0.88rem, 1.4vw, 1.08rem);
+      font-weight: 300;
+      line-height: 1.85;
+      color: rgba(255,255,255,0.82);
+      max-width: 520px;
+    }
+    .definition strong {
+      color: var(--cyan);
+      font-weight: 500;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .tag {
+      font-size: 0.75rem;
+      padding: 4px 12px;
+      border: 1px solid rgba(123,47,255,0.5);
+      border-radius: 4px;
+      color: rgba(255,255,255,0.7);
+      background: rgba(123,47,255,0.1);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Right panel (Three.js image) ── */
+    #canvas-panel {
+      width: 50%;
+      height: 100vh;
+      position: relative;
+    }
+    #three-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: pointer;
+    }
+
+    /* ── Overlay backdrop ── */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      background: rgba(0,0,0,0);
+      pointer-events: none;
+      transition: background 0.45s ease;
+    }
+    #overlay.active {
+      background: rgba(0,0,0,0.72);
+      pointer-events: auto;
+    }
+
+    /* ── Expanded image container ── */
+    #expanded-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 95;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #expanded-wrap.active {
+      pointer-events: auto;
+      opacity: 1;
+    }
+    #expanded-canvas {
+      width: min(80vw, 80vh);
+      height: min(80vw, 80vh);
+      border-radius: 12px;
+      box-shadow: 0 0 80px rgba(0,0,0,0.85), 0 0 30px rgba(0,245,255,0.08);
+      cursor: grab;
+      display: block;
+    }
+    #expanded-canvas:active { cursor: grabbing; }
+
+    /* ── Close button ── */
+    #close-btn {
+      position: fixed;
+      top: 24px; right: 28px;
+      z-index: 100;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 2px solid var(--cyan);
+      background: rgba(3,6,15,0.85);
+      color: var(--cyan);
+      font-size: 1.25rem;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px var(--glow);
+      transition: background 0.2s, transform 0.2s;
+    }
+    #close-btn:hover { background: rgba(0,245,255,0.15); transform: scale(1.12); }
+
+    /* ── Navigation arrows ── */
+    .nav-arrow {
+      position: fixed;
+      bottom: 32px;
+      z-index: 50;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.55);
+      padding: 10px 20px;
+      border: 1px solid rgba(0,245,255,0.2);
+      border-radius: 999px;
+      background: rgba(3,6,15,0.6);
+      backdrop-filter: blur(8px);
+      transition: color 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+    }
+    .nav-arrow:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 20px var(--glow);
+      transform: translateY(-2px);
+    }
+    .nav-arrow .arrow { font-size: 1.2rem; }
+    #nav-prev { left: 32px; }
+    #nav-next { right: 32px; }
+
+    /* ── Slide number ── */
+    .slide-num {
+      position: fixed;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.3);
+    }
+
+    /* ── Scan line overlay ── */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,0.06) 3px,
+        rgba(0,0,0,0.06) 4px
+      );
+    }
+
+    /* ── Corner decorations ── */
+    .corner {
+      position: fixed;
+      width: 24px; height: 24px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .corner.tl { top: 16px; left: 16px; border-top: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+    .corner.tr { top: 16px; right: 16px; border-top: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
+    .corner.bl { bottom: 16px; left: 16px; border-bottom: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+    .corner.br { bottom: 16px; right: 16px; border-bottom: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
+
+    /* ── Animations ── */
+    @keyframes slideInLeft {
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.35; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      html, body { overflow-y: auto; }
+      #slide {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+      }
+      #text-panel {
+        width: 100%;
+        padding: 6vh 6vw 3vh;
+      }
+      #canvas-panel {
+        width: 100%;
+        height: 50vh;
+      }
+      #nav-prev, #nav-next { padding: 8px 14px; font-size: 0.7rem; }
+      .slide-num { display: none; }
+    }
+  </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Serie de Fibonacci</h2>
+  <!-- Particle background -->
+  <canvas id="bg-canvas"></canvas>
+  <!-- Scanlines -->
+  <div class="scanlines"></div>
+  <!-- Corner deco -->
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
 
-    <input type="number" id="numero" placeholder="Ingresa un número" min="1">
-    <button onclick="calcular()">Calcular</button>
+  <!-- Slide -->
+  <div id="slide">
+    <!-- LEFT: Text -->
+    <div id="text-panel">
+      <div class="chip"><span class="chip-dot"></span>Slide 02 — Definición</div>
+      <h1>¿Qué es el<br/><span class="accent">Backend?</span></h1>
+      <div class="divider"></div>
+      <p class="definition">
+        El backend es la parte del desarrollo web y de aplicaciones que funciona en
+        <strong>segundo plano</strong>, invisible para el usuario. Su función principal es
+        gestionar la <strong>lógica de negocio</strong>, procesar datos, interactuar con
+        la <strong>base de datos</strong> y manejar la <strong>seguridad</strong>,
+        asegurando que la interfaz visible (<em>frontend</em>) funcione correctamente.
+      </p>
+      <div class="tags">
+        <span class="tag">Lógica de negocio</span>
+        <span class="tag">Base de datos</span>
+        <span class="tag">APIs</span>
+        <span class="tag">Seguridad</span>
+        <span class="tag">Servidor</span>
+      </div>
+    </div>
 
-    <p id="resultado"></p>
-</div>
+    <!-- RIGHT: Three.js canvas -->
+    <div id="canvas-panel">
+      <canvas id="three-canvas"></canvas>
+    </div>
+  </div>
 
-<script>
-    function calcular() {
-        const n = parseInt(document.getElementById("numero").value);
-        const resultado = document.getElementById("resultado");
+  <!-- Overlay backdrop -->
+  <div id="overlay"></div>
 
-        if (isNaN(n) || n <= 0) {
-            resultado.textContent = "Ingresa un número válido";
-            return;
-        }
+  <!-- Expanded image viewer -->
+  <div id="expanded-wrap">
+    <canvas id="expanded-canvas"></canvas>
+  </div>
 
-        let fib = [0, 1];
+  <!-- Close button -->
+  <button id="close-btn" title="Cerrar">✕</button>
 
-        for (let i = 2; i < n; i++) {
-            fib[i] = fib[i - 1] + fib[i - 2];
-        }
+  <!-- Navigation -->
+  <a href="index.html"  class="nav-arrow" id="nav-prev"><span class="arrow">←</span> Anterior</a>
+  <a href="index3.html" class="nav-arrow" id="nav-next">Siguiente <span class="arrow">→</span></a>
+  <div class="slide-num">02 / 05</div>
 
-        resultado.textContent = "Serie: " + fib.slice(0, n).join(", ");
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+  /* ═══════════════════════════════════════════
+     1. PARTICLE BACKGROUND (bg-canvas)
+  ═══════════════════════════════════════════ */
+  (function () {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let W, H, particles = [];
+
+    function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+
+    class Particle {
+      constructor() { this.reset(true); }
+      reset(rand) {
+        this.x = Math.random() * W;
+        this.y = rand ? Math.random() * H : H + 10;
+        this.vx = (Math.random() - 0.5) * 0.3;
+        this.vy = -(Math.random() * 0.6 + 0.2);
+        this.r = Math.random() * 1.4 + 0.3;
+        this.alpha = Math.random() * 0.6 + 0.2;
+        this.hue = Math.random() < 0.6 ? 188 : 260;
+      }
+      update() { this.x += this.vx; this.y += this.vy; if (this.y < -10) this.reset(false); }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${this.hue},100%,70%,${this.alpha})`;
+        ctx.fill();
+      }
     }
-</script>
+    for (let i = 0; i < 180; i++) particles.push(new Particle());
+    function loop() { ctx.clearRect(0, 0, W, H); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(loop); }
+    loop();
+  })();
 
+  /* ═══════════════════════════════════════════
+     2. THREE.JS — PANEL (small, auto-rotate)
+  ═══════════════════════════════════════════ */
+  (function () {
+    const panel  = document.getElementById('canvas-panel');
+    const canvas = document.getElementById('three-canvas');
+
+    const scene    = new THREE.Scene();
+    const camera   = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.z = 3;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Pure white light — no color tinting on the image
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+    const geo = new THREE.PlaneGeometry(2.2, 2.2);
+    const loader = new THREE.TextureLoader();
+    let mesh;
+
+    function buildMesh(tex) {
+      tex.colorSpace = THREE.SRGBColorSpace !== undefined ? THREE.SRGBColorSpace : tex.colorSpace;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+      mesh = new THREE.Mesh(geo, mat);
+      scene.add(mesh);
+    }
+
+    // Fallback if image missing
+    function fallbackTex() {
+      const c = document.createElement('canvas'); c.width = c.height = 512;
+      const g = c.getContext('2d');
+      g.fillStyle = '#0d1b2a'; g.fillRect(0,0,512,512);
+      g.strokeStyle = 'rgba(0,245,255,0.5)'; g.lineWidth = 1.5;
+      for (let i=0;i<8;i++){g.beginPath();g.moveTo(i*70,0);g.lineTo(0,i*70);g.stroke();}
+      g.fillStyle='#00f5ff';g.font='bold 48px monospace';g.textAlign='center';
+      g.fillText('BACKEND',256,256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    loader.load('imagenes/backend1.jpg', tex => buildMesh(tex), undefined, () => buildMesh(fallbackTex()));
+
+    function resize() {
+      const w = panel.clientWidth, h = panel.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Auto-rotate (idle)
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.008;
+      if (mesh) {
+        mesh.rotation.y = Math.sin(t * 0.7) * 0.22;
+        mesh.rotation.x = Math.sin(t * 0.5) * 0.09;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Click → open expanded viewer
+    const raycaster = new THREE.Raycaster();
+    const mouse     = new THREE.Vector2();
+
+    function getXY(e, useChanged) {
+      const rect = canvas.getBoundingClientRect();
+      // touchend: touches[] está vacío, usar changedTouches[]
+      const touch = useChanged ? e.changedTouches[0] : (e.touches && e.touches[0]);
+      const cx = touch ? touch.clientX : e.clientX;
+      const cy = touch ? touch.clientY : e.clientY;
+      return { x: ((cx-rect.left)/rect.width)*2-1, y: -((cy-rect.top)/rect.height)*2+1 };
+    }
+
+    function tryOpen(e, useChanged) {
+      if (!mesh) return;
+      const {x,y} = getXY(e, useChanged);
+      mouse.set(x,y);
+      raycaster.setFromCamera(mouse, camera);
+      if (raycaster.intersectObject(mesh).length > 0) openExpanded();
+    }
+
+    canvas.addEventListener('click', e => tryOpen(e, false));
+    canvas.addEventListener('touchend', e => { e.preventDefault(); tryOpen(e, true); }, { passive: false });
+    canvas.style.cursor = 'pointer';
+
+    // Expose texture for expanded viewer
+    window._backendGetTexture = () => mesh ? mesh.material.map : null;
+  })();
+
+  /* ═══════════════════════════════════════════
+     3. EXPANDED VIEWER (full-screen, drag-rotate)
+  ═══════════════════════════════════════════ */
+  const overlay      = document.getElementById('overlay');
+  const expandedWrap = document.getElementById('expanded-wrap');
+  const expandedCvs  = document.getElementById('expanded-canvas');
+  const closeBtn     = document.getElementById('close-btn');
+
+  let expScene, expCamera, expRenderer, expMesh, expAnimId;
+  let isDragging = false, lastX = 0, lastY = 0;
+  let rotX = 0, rotY = 0, velX = 0, velY = 0;
+
+  function openExpanded() {
+    // Build or reuse scene
+    if (!expRenderer) {
+      expScene  = new THREE.Scene();
+      expCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+      expCamera.position.z = 3;
+      expRenderer = new THREE.WebGLRenderer({ canvas: expandedCvs, alpha: true, antialias: true });
+      expRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      expScene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    }
+
+    // Sync texture from small scene
+    const tex = window._backendGetTexture();
+    if (tex && (!expMesh || expMesh.material.map !== tex)) {
+      if (expMesh) expScene.remove(expMesh);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+      expMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), mat);
+      expScene.add(expMesh);
+    }
+
+    // Size the canvas
+    const size = Math.min(window.innerWidth * 0.82, window.innerHeight * 0.82);
+    expandedCvs.style.width  = size + 'px';
+    expandedCvs.style.height = size + 'px';
+    expRenderer.setSize(size, size);
+    expCamera.aspect = 1;
+    expCamera.updateProjectionMatrix();
+
+    rotX = 0; rotY = 0; velX = 0; velY = 0;
+
+    // Show
+    overlay.classList.add('active');
+    expandedWrap.classList.add('active');
+    closeBtn.style.display = 'flex';
+
+    // Start loop
+    cancelAnimationFrame(expAnimId);
+    (function loop() {
+      expAnimId = requestAnimationFrame(loop);
+      if (!isDragging) { rotX += velX; rotY += velY; velX *= 0.92; velY *= 0.92; }
+      if (expMesh) { expMesh.rotation.y = rotY; expMesh.rotation.x = rotX; }
+      expRenderer.render(expScene, expCamera);
+    })();
+  }
+
+  function closeExpanded() {
+    overlay.classList.remove('active');
+    expandedWrap.classList.remove('active');
+    closeBtn.style.display = 'none';
+    cancelAnimationFrame(expAnimId);
+  }
+
+  closeBtn.addEventListener('click', closeExpanded);
+  overlay.addEventListener('click', closeExpanded);
+
+  // ── Drag on expanded canvas ──
+  function onDragStart(x, y) { isDragging = true; lastX = x; lastY = y; velX = 0; velY = 0; }
+  function onDragMove(x, y) {
+    if (!isDragging) return;
+    const dx = x - lastX, dy = y - lastY;
+    velY = dx * 0.008; velX = dy * 0.008;
+    rotY += velY; rotX += velX;
+    lastX = x; lastY = y;
+  }
+  function onDragEnd() { isDragging = false; }
+
+  expandedCvs.addEventListener('mousedown',  e => onDragStart(e.clientX, e.clientY));
+  window.addEventListener('mousemove',       e => onDragMove(e.clientX, e.clientY));
+  window.addEventListener('mouseup',         onDragEnd);
+
+  expandedCvs.addEventListener('touchstart', e => { e.preventDefault(); onDragStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  expandedCvs.addEventListener('touchmove',  e => { e.preventDefault(); onDragMove(e.touches[0].clientX, e.touches[0].clientY);  }, { passive: false });
+  expandedCvs.addEventListener('touchend',   onDragEnd);
+  </script>
 </body>
 </html>
